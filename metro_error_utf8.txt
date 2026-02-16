@@ -1,0 +1,53 @@
+﻿
+> SkiDoRider@0.0.1 start
+> react-native start
+
+node.exe : 
+(node:21424) 
+[DEP0040] 
+DeprecationWarning: 
+The `punycode` 
+module is 
+deprecated. Please 
+use a userland 
+alternative instead.
+At C:\nvm4w\nodejs\np
+m.ps1:29 char:3
++   & $NODE_EXE 
+$NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
+    + CategoryInfo   
+           : 
+NotSpecifi    ed: 
+((node:21424)     
+[D...native instea   
+ d.:String) [], Rem  
+  oteException
+    + 
+FullyQualifiedEr    
+rorId : NativeComm   
+ andError
+ 
+(Use `node 
+--trace-deprecation 
+...` to show where 
+the warning was 
+created)
+info Welcome to React Native v0.73
+info Starting dev server on port 8081...
+error listen 
+EADDRINUSE: address 
+already in use 
+:::8081.
+Error: listen EADDRINUSE: address already in use :::8081
+    at Server.setupListenHandle [as _listen2] (node:net:1937:16)
+    at listenInCluster (node:net:1994:12)
+    at Server.listen (node:net:2099:7)
+    at C:\Users\sande\Desktop\Captain App\SkiDoRider\node_modules\metro\src\index.flow.js:328:14
+    at new Promise (<anonymous>)
+    at earlyPortCheck (C:\Users\sande\Desktop\Captain App\SkiDoRider\node_modules\metro\src\index.flow.js:324:11)
+    at exports.runServer (C:\Users\sande\Desktop\Captain App\SkiDoRider\node_modules\metro\src\index.flow.js:124:9)
+    at Object.runServer [as func] (C:\Users\sande\Desktop\Captain App\SkiDoRider\node_modules\@react-native\community-cli-plugin\dist\commands\start\runServer.js:123:47)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Command.handleAction (C:\Users\sande\Desktop\Captain App\SkiDoRider\node_modules\@react-native-community\cli\build\index.js:118:9)
