@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -9,32 +9,24 @@ import {
   Alert,
   PermissionsAndroid,
   Platform,
-  Image,
   Dimensions,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import {useOnboardingStore, DocumentFiles} from '../store/onboardingStore';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
-// Responsive scaling functions
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
-const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
+const moderateScale = (size: number, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
 
-// Responsive helpers
 const isSmallDevice = SCREEN_WIDTH < 375;
-const isMediumDevice = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
-const isLargeDevice = SCREEN_WIDTH >= 414;
 
-interface Document {
-  id: string;
-  name: string;
-  uploaded: boolean;
-  useCamera: boolean;
-}
-
-/* 🎨 Color System */
+// ─── Color System ────────────────────────────────────────────
 const COLORS = {
   primary: '#2563EB',
   primaryLight: '#DBEAFE',
@@ -47,10 +39,56 @@ const COLORS = {
   disabled: '#93C5FD',
 };
 
-/* 🔐 Camera Permission */
+// ─── Document definitions (mapped to API field names) ────────
+interface DocItem {
+  id: keyof DocumentFiles;
+  name: string;
+  description: string;
+  useCamera: boolean;
+  icon: string;
+}
+
+const DOCUMENTS: DocItem[] = [
+  {
+    id: 'aadhar_front',
+    name: 'Aadhar Card (Front)',
+    description: 'Upload front side of your Aadhar',
+    useCamera: false,
+    icon: 'card-outline',
+  },
+  {
+    id: 'aadhar_back',
+    name: 'Aadhar Card (Back)',
+    description: 'Upload back side of your Aadhar',
+    useCamera: false,
+    icon: 'card-outline',
+  },
+  {
+    id: 'driving_license',
+    name: 'Driving License',
+    description: 'Upload your driving license',
+    useCamera: false,
+    icon: 'document-outline',
+  },
+  {
+    id: 'vehicle_rc',
+    name: 'Vehicle RC',
+    description: 'Upload vehicle registration certificate',
+    useCamera: false,
+    icon: 'car-outline',
+  },
+  {
+    id: 'profile_photo',
+    name: 'Profile Photo (Selfie)',
+    description: 'Take a clear selfie',
+    useCamera: true,
+    icon: 'camera-outline',
+  },
+];
+
+// ─── Camera Permission ───────────────────────────────────────
 const requestCameraPermission = async () => {
   if (Platform.OS !== 'android') return true;
-
   const granted = await PermissionsAndroid.request(
     PermissionsAndroid.PERMISSIONS.CAMERA,
     {
@@ -58,87 +96,89 @@ const requestCameraPermission = async () => {
       message: 'Camera access is required to take your selfie',
       buttonPositive: 'Allow',
       buttonNegative: 'Cancel',
-    }
+    },
   );
-
   return granted === PermissionsAndroid.RESULTS.GRANTED;
 };
 
-export default function DocumentUploadScreen({ route, navigation }: any) {
-  const { vehicleType } = route.params;
+// ─── Component ───────────────────────────────────────────────
+export default function DocumentUploadScreen({navigation}: any) {
+  const setDocumentsStore = useOnboardingStore(s => s.setDocuments);
 
-  const [documents, setDocuments] = useState<Document[]>([
-    { id: 'aadhar', name: 'Aadhar Card', uploaded: false, useCamera: false },
-    { id: 'license', name: 'Driving License', uploaded: false, useCamera: false },
-    { id: 'insurance', name: 'Vehicle Insurance', uploaded: false, useCamera: false },
-    { id: 'photo', name: 'Profile Photo (Selfie)', uploaded: false, useCamera: true },
-  ]);
+  const [fileUris, setFileUris] = useState<DocumentFiles>({
+    aadhar_front: null,
+    aadhar_back: null,
+    driving_license: null,
+    vehicle_rc: null,
+    profile_photo: null,
+  });
 
-  /* 📸 Document Click Handler */
-  const handleDocumentClick = async (doc: Document) => {
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [licenseExpiry, setLicenseExpiry] = useState('');
+
+  // Handle picking / capturing a document
+  const handleDocumentClick = useCallback(async (doc: DocItem) => {
     try {
       if (doc.useCamera) {
-        // 🔴 REQUEST CAMERA PERMISSION
         const hasPermission = await requestCameraPermission();
         if (!hasPermission) {
-          Alert.alert('Permission Denied', 'Camera permission is required');
+          Alert.alert('Permission Denied', 'Camera permission is required.');
           return;
         }
 
-        // 🔴 OPEN FRONT CAMERA
         const result = await launchCamera({
           mediaType: 'photo',
           cameraType: 'front',
           quality: 0.8,
-          saveToPhotos: true,
+          saveToPhotos: false,
         });
 
         if (result.didCancel) return;
-
         if (result.assets?.[0]?.uri) {
-          uploadDocument(doc.id, result.assets[0].uri);
+          setFileUris(prev => ({...prev, [doc.id]: result.assets![0].uri!}));
         }
       } else {
-        // 📎 OPEN GALLERY
         const result = await launchImageLibrary({
           mediaType: 'photo',
           quality: 0.8,
         });
 
         if (result.didCancel) return;
-
         if (result.assets?.[0]?.uri) {
-          uploadDocument(doc.id, result.assets[0].uri);
+          setFileUris(prev => ({...prev, [doc.id]: result.assets![0].uri!}));
         }
       }
     } catch (error) {
       console.log(error);
-      Alert.alert('Error', 'Failed to open camera or gallery');
+      Alert.alert('Error', 'Failed to open camera or gallery.');
     }
-  };
+  }, []);
 
-  const uploadDocument = (docId: string, uri: string) => {
-    console.log(`Uploading ${docId}:`, uri);
+  const uploadedCount = Object.values(fileUris).filter(Boolean).length;
+  const allDocsUploaded = uploadedCount === DOCUMENTS.length;
 
-    setDocuments(prev =>
-      prev.map(doc =>
-        doc.id === docId ? { ...doc, uploaded: true } : doc
-      )
-    );
-  };
+  const isFormValid =
+    allDocsUploaded &&
+    licenseNumber.trim().length > 0 &&
+    licenseExpiry.trim().length > 0;
 
   const handleContinue = () => {
-    const allUploaded = documents.every(doc => doc.uploaded);
-
-    if (!allUploaded) {
-      Alert.alert('Missing Documents', 'Please upload all required documents');
+    if (!isFormValid) {
+      Alert.alert(
+        'Incomplete',
+        'Please upload all documents and fill in license details.',
+      );
       return;
     }
 
+    setDocumentsStore({
+      documents: fileUris,
+      licenseNumber: licenseNumber.trim(),
+      licenseExpiry: licenseExpiry.trim(),
+    });
+
     navigation.navigate('ProfileSetup');
   };
-
-  const uploadedCount = documents.filter(d => d.uploaded).length;
 
   return (
     <View style={styles.container}>
@@ -146,89 +186,128 @@ export default function DocumentUploadScreen({ route, navigation }: any) {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={navigation.goBack}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
           activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="arrow-back" size={moderateScale(22)} color={COLORS.primary} />
+          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+          <Ionicons
+            name="arrow-back"
+            size={moderateScale(22)}
+            color={COLORS.primary}
+          />
         </TouchableOpacity>
 
         <Text style={styles.title}>Upload Documents</Text>
         <Text style={styles.subtitle}>
-          Progress: {uploadedCount} of {documents.length} completed
+          Progress: {uploadedCount} of {DOCUMENTS.length} completed
         </Text>
       </View>
 
       {/* Content */}
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {documents.map(doc => (
-          <TouchableOpacity
-            key={doc.id}
-            activeOpacity={0.85}
-            style={[
-              styles.documentCard,
-              doc.uploaded && styles.documentCardUploaded,
-            ]}
-            onPress={() => handleDocumentClick(doc)}
-          >
-            <View style={styles.documentInfo}>
-              <Text style={styles.documentName}>{doc.name}</Text>
-              <Text style={styles.documentStatus}>
-                {doc.uploaded
-                  ? 'Uploaded successfully'
-                  : doc.useCamera
-                  ? 'Take a selfie'
-                  : 'Upload document'}
-              </Text>
+      <KeyboardAvoidingView
+        style={{flex: 1}}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          {/* Document Cards */}
+          {DOCUMENTS.map(doc => {
+            const isUploaded = !!fileUris[doc.id];
+            return (
+              <TouchableOpacity
+                key={doc.id}
+                activeOpacity={0.85}
+                style={[
+                  styles.documentCard,
+                  isUploaded && styles.documentCardUploaded,
+                ]}
+                onPress={() => handleDocumentClick(doc)}>
+                <View style={styles.documentInfo}>
+                  <Text style={styles.documentName}>{doc.name}</Text>
+                  <Text style={styles.documentStatus}>
+                    {isUploaded ? 'Uploaded successfully' : doc.description}
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.uploadIcon,
+                    isUploaded && styles.uploadIconSuccess,
+                  ]}>
+                  {isUploaded ? (
+                    <Ionicons
+                      name="checkmark"
+                      size={moderateScale(24)}
+                      color="#FFFFFF"
+                    />
+                  ) : (
+                    <Ionicons
+                      name={doc.icon as any}
+                      size={moderateScale(24)}
+                      color={COLORS.primary}
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* License Details */}
+          <View style={styles.licenseSection}>
+            <Text style={styles.sectionTitle}>License Details</Text>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>License Number *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. OD02-20220001234"
+                placeholderTextColor="#999"
+                value={licenseNumber}
+                onChangeText={setLicenseNumber}
+                autoCapitalize="characters"
+              />
             </View>
 
-            <View
-              style={[
-                styles.uploadIcon,
-                doc.uploaded && styles.uploadIconSuccess,
-              ]}
-            >
-              {doc.uploaded ? (
-                <Ionicons name="checkmark" size={moderateScale(24)} color="#FFFFFF" />
-              ) : doc.useCamera ? (
-                <Ionicons name="camera" size={moderateScale(24)} color={COLORS.primary} />
-              ) : (
-                <Ionicons name="cloud-upload-outline" size={moderateScale(24)} color={COLORS.primary} />
-              )}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>License Expiry Date *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD (e.g. 2030-12-31)"
+                placeholderTextColor="#999"
+                value={licenseExpiry}
+                onChangeText={setLicenseExpiry}
+                keyboardType="default"
+              />
             </View>
-          </TouchableOpacity>
-        ))}
+          </View>
 
-        <View style={styles.infoBox}>
-          <Ionicons 
-            name="information-circle" 
-            size={moderateScale(20)} 
-            color={COLORS.primary} 
-            style={styles.infoIcon} 
-          />
-          <Text style={styles.infoText}>
-            Make sure photos are clear and details are readable
-          </Text>
-        </View>
-      </ScrollView>
+          {/* Info */}
+          <View style={styles.infoBox}>
+            <Ionicons
+              name="information-circle"
+              size={moderateScale(20)}
+              color={COLORS.primary}
+              style={styles.infoIcon}
+            />
+            <Text style={styles.infoText}>
+              Make sure photos are clear and details are readable
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity
-          disabled={uploadedCount !== documents.length}
+          disabled={!isFormValid}
           onPress={handleContinue}
           activeOpacity={0.8}
           style={[
             styles.continueButton,
-            uploadedCount !== documents.length &&
-              styles.continueButtonDisabled,
-          ]}
-        >
+            !isFormValid && styles.continueButtonDisabled,
+          ]}>
           <Text style={styles.continueButtonText}>Continue</Text>
         </TouchableOpacity>
       </View>
@@ -236,7 +315,7 @@ export default function DocumentUploadScreen({ route, navigation }: any) {
   );
 }
 
-/* 🎨 Styles */
+// ─── Styles ──────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -258,11 +337,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: verticalScale(14),
-  },
-  backIcon: {
-    fontSize: moderateScale(20),
-    fontWeight: '600',
-    color: COLORS.primary,
   },
   title: {
     fontSize: moderateScale(isSmallDevice ? 24 : 28),
@@ -289,7 +363,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 3,
@@ -324,9 +398,36 @@ const styles = StyleSheet.create({
   uploadIconSuccess: {
     backgroundColor: COLORS.success,
   },
-  uploadIconText: {
-    fontSize: moderateScale(20),
+  // ─── License Section ──────────────────────────────────
+  licenseSection: {
+    marginTop: verticalScale(12),
+    marginBottom: verticalScale(12),
   },
+  sectionTitle: {
+    fontSize: moderateScale(20),
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: verticalScale(16),
+  },
+  inputContainer: {
+    marginBottom: verticalScale(16),
+  },
+  label: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: verticalScale(8),
+  },
+  input: {
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: scale(16),
+    paddingVertical: verticalScale(14),
+    borderRadius: moderateScale(12),
+    fontSize: moderateScale(16),
+    color: COLORS.textPrimary,
+    minHeight: verticalScale(50),
+  },
+  // ─── Info + Footer ────────────────────────────────────
   infoBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -352,11 +453,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     paddingHorizontal: scale(20),
     paddingTop: verticalScale(16),
-    paddingBottom: Platform.OS === 'ios' ? verticalScale(36) : verticalScale(20),
+    paddingBottom:
+      Platform.OS === 'ios' ? verticalScale(36) : verticalScale(20),
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: {width: 0, height: -2},
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 8,
@@ -369,7 +471,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: verticalScale(54),
     shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,

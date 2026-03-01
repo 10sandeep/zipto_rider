@@ -10,13 +10,15 @@ import {
   Platform,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import {useAuthStore} from '../store/authStore';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
 // Responsive scaling functions
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
-const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
+const moderateScale = (size: number, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
 
 // Responsive helpers
 const isSmallDevice = SCREEN_WIDTH < 375;
@@ -24,33 +26,56 @@ const isMediumDevice = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
 const isLargeDevice = SCREEN_WIDTH >= 414;
 
 export default function ProfileScreen({navigation}: any) {
+  const {user, profile, clearAuth} = useAuthStore();
+
+  const handleLogout = () => {
+    clearAuth();
+    navigation.replace('Welcome');
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return 'PR';
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const displayName = profile?.name || user?.name || 'Driver Partner';
+  const displayPhone = profile?.phone || user?.phone || 'No phone provided';
+  const rating = profile?.average_rating
+    ? Number(profile.average_rating).toFixed(1)
+    : 'New';
+  const totalTrips = profile?.total_trips || 0;
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+        showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>RK</Text>
+            <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
           </View>
-          <Text style={styles.name}>Raj Kumar</Text>
-          <Text style={styles.phone}>+91 98765 43210</Text>
+          <Text style={styles.name}>{displayName}</Text>
+          <Text style={styles.phone}>{displayPhone}</Text>
           <View style={styles.ratingContainer}>
-            <Text style={styles.rating}>⭐ 4.8</Text>
-            <Text style={styles.ratingText}>(245 ratings)</Text>
+            <Text style={styles.rating}>⭐ {rating}</Text>
           </View>
         </View>
 
         <View style={styles.statsGrid}>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>856</Text>
+            <Text style={styles.statValue}>{totalTrips}</Text>
             <Text style={styles.statLabel}>Total Deliveries</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>98%</Text>
-            <Text style={styles.statLabel}>On-Time</Text>
+            <Text style={styles.statValue}>
+              {profile?.wallet_balance ? `₹${profile.wallet_balance}` : '₹0'}
+            </Text>
+            <Text style={styles.statLabel}>Wallet Balance</Text>
           </View>
         </View>
 
@@ -87,11 +112,10 @@ export default function ProfileScreen({navigation}: any) {
           />
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.logoutButton}
-          onPress={() => navigation.navigate('Login')}
-          activeOpacity={0.7}
-        >
+          onPress={handleLogout}
+          activeOpacity={0.7}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -100,11 +124,10 @@ export default function ProfileScreen({navigation}: any) {
 }
 
 const MenuItem = ({icon, label, onPress}: any) => (
-  <TouchableOpacity 
-    style={styles.menuItem} 
+  <TouchableOpacity
+    style={styles.menuItem}
     onPress={onPress}
-    activeOpacity={0.7}
-  >
+    activeOpacity={0.7}>
     <Text style={styles.menuIcon}>{icon}</Text>
     <Text style={styles.menuLabel}>{label}</Text>
     <Ionicons name="chevron-forward" size={moderateScale(20)} color="#8E8E93" />
@@ -113,11 +136,11 @@ const MenuItem = ({icon, label, onPress}: any) => (
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, 
-    backgroundColor: '#F8F9FA'
+    flex: 1,
+    backgroundColor: '#F8F9FA',
   },
   scrollContent: {
-    paddingBottom: verticalScale(100)
+    paddingBottom: verticalScale(100),
   },
   profileHeader: {
     backgroundColor: '#FFFFFF',
@@ -145,33 +168,33 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   avatarText: {
-    fontSize: moderateScale(32), 
-    fontWeight: '800', 
-    color: '#FFFFFF'
+    fontSize: moderateScale(32),
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   name: {
-    fontSize: moderateScale(24), 
-    fontWeight: '800', 
-    color: '#1C1C1E', 
-    marginBottom: verticalScale(4)
+    fontSize: moderateScale(24),
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: verticalScale(4),
   },
   phone: {
-    fontSize: moderateScale(15), 
-    color: '#8E8E93', 
-    marginBottom: verticalScale(12)
+    fontSize: moderateScale(15),
+    color: '#8E8E93',
+    marginBottom: verticalScale(12),
   },
   ratingContainer: {
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: scale(8)
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
   },
   rating: {
-    fontSize: moderateScale(16), 
-    fontWeight: '700'
+    fontSize: moderateScale(16),
+    fontWeight: '700',
   },
   ratingText: {
-    fontSize: moderateScale(14), 
-    color: '#8E8E93'
+    fontSize: moderateScale(14),
+    color: '#8E8E93',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -200,7 +223,7 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(4),
   },
   statLabel: {
-    fontSize: moderateScale(13), 
+    fontSize: moderateScale(13),
     color: '#8E8E93',
     textAlign: 'center',
   },
@@ -225,14 +248,14 @@ const styles = StyleSheet.create({
     minHeight: verticalScale(60),
   },
   menuIcon: {
-    fontSize: moderateScale(24), 
-    marginRight: scale(12)
+    fontSize: moderateScale(24),
+    marginRight: scale(12),
   },
   menuLabel: {
-    flex: 1, 
-    fontSize: moderateScale(16), 
-    fontWeight: '600', 
-    color: '#1C1C1E'
+    flex: 1,
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   logoutButton: {
     margin: scale(20),
@@ -249,8 +272,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   logoutText: {
-    fontSize: moderateScale(16), 
-    fontWeight: '700', 
-    color: '#EF4444'
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+    color: '#EF4444',
   },
 });

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,9 @@ import {
   StatusBar,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import {getMyVehicles, Vehicle} from '../services/driverService';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
@@ -16,69 +18,143 @@ const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 // Responsive scaling functions
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
-const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
+const moderateScale = (size: number, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
 
 // Responsive helpers
 const isSmallDevice = SCREEN_WIDTH < 375;
-const isMediumDevice = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
-const isLargeDevice = SCREEN_WIDTH >= 414;
 
 export default function VehicleDetailsScreen({navigation}: any) {
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchVehicles = async () => {
+      try {
+        const data = await getMyVehicles();
+        setVehicles(data || []);
+      } catch (error) {
+        console.error('Failed to fetch vehicles:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchVehicles();
+  }, []);
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          {justifyContent: 'center', alignItems: 'center'},
+        ]}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+      </View>
+    );
+  }
+
+  const vehicle = vehicles.length > 0 ? vehicles[0] : null;
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={moderateScale(24)} color="#3B82F6" />
+          activeOpacity={0.7}>
+          <Ionicons
+            name="arrow-back"
+            size={moderateScale(24)}
+            color="#3B82F6"
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Vehicle Details</Text>
         <View style={{width: moderateScale(24)}} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.vehicleCard}>
-          <Text style={styles.vehicleIcon}>🏍️</Text>
-          <Text style={styles.vehicleType}>Bike</Text>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>● Verified</Text>
-          </View>
-        </View>
+        showsVerticalScrollIndicator={false}>
+        {vehicle ? (
+          <>
+            <View style={styles.vehicleCard}>
+              <Text style={styles.vehicleIcon}>
+                {vehicle.vehicle_type?.toLowerCase() === 'bike' ? '🏍️' : '🚗'}
+              </Text>
+              <Text style={styles.vehicleType}>
+                {vehicle.vehicle_type
+                  ? vehicle.vehicle_type.charAt(0).toUpperCase() +
+                    vehicle.vehicle_type.slice(1)
+                  : 'Vehicle'}
+              </Text>
+              <View
+                style={[
+                  styles.statusBadge,
+                  vehicle.verification_status !== 'approved' && {
+                    backgroundColor: '#FEF3C7',
+                  },
+                ]}>
+                <Text
+                  style={[
+                    styles.statusText,
+                    vehicle.verification_status !== 'approved' && {
+                      color: '#D97706',
+                    },
+                  ]}>
+                  ●{' '}
+                  {vehicle.verification_status
+                    ? vehicle.verification_status.charAt(0).toUpperCase() +
+                      vehicle.verification_status.slice(1)
+                    : 'Pending'}
+                </Text>
+              </View>
+            </View>
 
-        <View style={styles.detailsSection}>
-          <Text style={styles.sectionTitle}>Vehicle Information</Text>
-          <View style={styles.detailCard}>
-            <DetailRow label="Registration Number" value="KA 01 AB 1234" />
-            <DetailRow label="Make & Model" value="Honda Activa 6G" />
-            <DetailRow label="Year" value="2022" />
-            <DetailRow label="Color" value="Black" />
-          </View>
-        </View>
+            <View style={styles.detailsSection}>
+              <Text style={styles.sectionTitle}>Vehicle Information</Text>
+              <View style={styles.detailCard}>
+                <DetailRow
+                  label="Registration Number"
+                  value={vehicle.registration_number?.toUpperCase() || 'N/A'}
+                />
+                <DetailRow
+                  label="Make & Model"
+                  value={vehicle.vehicle_model || 'N/A'}
+                />
+                <DetailRow
+                  label="Capacity"
+                  value={vehicle.capacity ? `${vehicle.capacity} kg` : 'N/A'}
+                />
+              </View>
+            </View>
 
-        <View style={styles.detailsSection}>
-          <Text style={styles.sectionTitle}>Documents</Text>
-          <View style={styles.documentsList}>
-            <DocumentItem name="RC Book" status="Verified" />
-            <DocumentItem
-              name="Insurance"
-              status="Verified"
-              expires="Valid till Dec 2026"
-            />
-            <DocumentItem name="Driving License" status="Verified" />
-            <DocumentItem name="Pollution Certificate" status="Verified" />
+            <View style={styles.detailsSection}>
+              <Text style={styles.sectionTitle}>Documents</Text>
+              <View style={styles.documentsList}>
+                <DocumentItem
+                  name="RC Book"
+                  status={vehicle.rc_document_url ? 'Uploaded' : 'Pending'}
+                />
+                <DocumentItem
+                  name="Insurance"
+                  status={
+                    vehicle.insurance_document_url ? 'Uploaded' : 'Pending'
+                  }
+                />
+              </View>
+            </View>
+          </>
+        ) : (
+          <View style={{alignItems: 'center', marginTop: 50}}>
+            <Text style={{fontSize: 16, color: '#666'}}>
+              No vehicles registered yet.
+            </Text>
           </View>
-        </View>
+        )}
 
-        <TouchableOpacity 
-          style={styles.addVehicleButton}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.addVehicleButton} activeOpacity={0.7}>
           <Text style={styles.addVehicleText}>+ Add Another Vehicle</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -107,8 +183,8 @@ const DocumentItem = ({name, status, expires}: any) => (
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, 
-    backgroundColor: '#F8F9FA'
+    flex: 1,
+    backgroundColor: '#F8F9FA',
   },
   header: {
     flexDirection: 'row',
@@ -127,13 +203,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   headerTitle: {
-    fontSize: moderateScale(18), 
-    fontWeight: '700', 
-    color: '#1C1C1E'
+    fontSize: moderateScale(18),
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
   scrollContent: {
-    padding: scale(20), 
-    paddingBottom: verticalScale(100)
+    padding: scale(20),
+    paddingBottom: verticalScale(100),
   },
   vehicleCard: {
     backgroundColor: '#FFFFFF',
@@ -148,8 +224,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   vehicleIcon: {
-    fontSize: moderateScale(isSmallDevice ? 50 : 60), 
-    marginBottom: verticalScale(12)
+    fontSize: moderateScale(isSmallDevice ? 50 : 60),
+    marginBottom: verticalScale(12),
   },
   vehicleType: {
     fontSize: moderateScale(22),
@@ -164,12 +240,12 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(20),
   },
   statusText: {
-    fontSize: moderateScale(13), 
-    fontWeight: '600', 
-    color: '#50C878'
+    fontSize: moderateScale(13),
+    fontWeight: '600',
+    color: '#50C878',
   },
   detailsSection: {
-    marginBottom: verticalScale(24)
+    marginBottom: verticalScale(24),
   },
   sectionTitle: {
     fontSize: moderateScale(16),
@@ -178,8 +254,8 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(12),
   },
   detailCard: {
-    backgroundColor: '#FFFFFF', 
-    padding: scale(16), 
+    backgroundColor: '#FFFFFF',
+    padding: scale(16),
     borderRadius: moderateScale(12),
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
@@ -197,13 +273,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   detailLabel: {
-    fontSize: moderateScale(14), 
+    fontSize: moderateScale(14),
     color: '#666',
     flex: 1,
   },
   detailValue: {
-    fontSize: moderateScale(14), 
-    fontWeight: '600', 
+    fontSize: moderateScale(14),
+    fontWeight: '600',
     color: '#1C1C1E',
     textAlign: 'right',
   },
@@ -237,8 +313,8 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(4),
   },
   documentExpiry: {
-    fontSize: moderateScale(12), 
-    color: '#8E8E93'
+    fontSize: moderateScale(12),
+    color: '#8E8E93',
   },
   verifiedBadge: {
     backgroundColor: '#F0FDF4',
@@ -248,9 +324,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   verifiedText: {
-    fontSize: moderateScale(12), 
-    fontWeight: '600', 
-    color: '#50C878'
+    fontSize: moderateScale(12),
+    fontWeight: '600',
+    color: '#50C878',
   },
   addVehicleButton: {
     backgroundColor: '#FFFFFF',
@@ -269,8 +345,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   addVehicleText: {
-    fontSize: moderateScale(16), 
-    fontWeight: '700', 
-    color: '#3B82F6'
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+    color: '#3B82F6',
   },
 });

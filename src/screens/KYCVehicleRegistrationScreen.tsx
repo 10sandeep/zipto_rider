@@ -8,58 +8,98 @@ import {
   ScrollView,
   Image,
   ImageStyle,
+  TextInput,
   Dimensions,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import {useOnboardingStore, ApiVehicleType} from '../store/onboardingStore';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
-// Responsive scaling functions
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
 const moderateScale = (size: number, factor = 0.5) =>
   size + (scale(size) - size) * factor;
 
-// Responsive helpers
 const isSmallDevice = SCREEN_WIDTH < 375;
-const isMediumDevice = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
-const isLargeDevice = SCREEN_WIDTH >= 414;
+
+// ─── Vehicle options (UI → API mapping) ──────────────────────
+const VEHICLE_TYPE_MAP: Record<string, ApiVehicleType> = {
+  bike: 'bike',
+  auto: 'pickup_van',
+  pickup: 'pickup_van',
+  truck: 'mini_truck',
+};
 
 const vehicles = [
   {
     id: 'bike',
     name: 'Bike',
-    image: require('../assets/vehicle2.png'), // Replace with your image path
+    image: require('../assets/vehicle2.png'),
     capacity: 'Up to 20kg',
+    defaultCapacity: '20',
   },
   {
     id: 'auto',
     name: 'Auto',
-    image: require('../assets/vehicle1.png'), // Replace with your image path
+    image: require('../assets/vehicle1.png'),
     capacity: 'Up to 50kg',
+    defaultCapacity: '50',
   },
   {
     id: 'pickup',
     name: 'Pick Up',
-    image: require('../assets/vehicle3.png'), // Replace with your image path
+    image: require('../assets/vehicle3.png'),
     capacity: 'Up to 500kg',
+    defaultCapacity: '500',
   },
   {
     id: 'truck',
     name: 'Truck',
-    image: require('../assets/vehicle4.png'), // Replace with your image path
+    image: require('../assets/vehicle4.png'),
     capacity: 'Up to 5000kg',
+    defaultCapacity: '5000',
   },
 ];
 
 export default function VehicleSelectionScreen({navigation}: any) {
+  const setVehicle = useOnboardingStore(s => s.setVehicle);
+
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [registrationNumber, setRegistrationNumber] = useState('');
+  const [vehicleCapacity, setVehicleCapacity] = useState('');
+
+  // Pre-fill capacity when a vehicle card is tapped
+  const onSelectVehicle = (id: string) => {
+    setSelectedVehicle(id);
+    const vehicle = vehicles.find(v => v.id === id);
+    if (vehicle) {
+      setVehicleCapacity(vehicle.defaultCapacity);
+    }
+  };
+
+  const isFormValid =
+    selectedVehicle &&
+    vehicleModel.trim().length > 0 &&
+    registrationNumber.trim().length > 0 &&
+    vehicleCapacity.trim().length > 0;
 
   const handleContinue = () => {
-    if (selectedVehicle) {
-      navigation.navigate('DocumentUpload', {vehicleType: selectedVehicle});
-    }
+    if (!selectedVehicle || !isFormValid) return;
+
+    const apiType = VEHICLE_TYPE_MAP[selectedVehicle] ?? 'bike';
+
+    setVehicle({
+      vehicleType: apiType,
+      vehicleModel: vehicleModel.trim(),
+      vehicleCapacity: vehicleCapacity.trim(),
+      vehicleRegistrationNumber: registrationNumber.trim(),
+    });
+
+    navigation.navigate('DocumentUpload');
   };
 
   return (
@@ -80,76 +120,120 @@ export default function VehicleSelectionScreen({navigation}: any) {
           />
         </TouchableOpacity>
         <View style={styles.progressBar}>
-          <View style={styles.progressFill} />
+          <View style={[styles.progressFill, {width: '25%'}]} />
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-        {/* Title */}
-        <Text style={styles.title}>Select Your Vehicle</Text>
-        <Text style={styles.subtitle}>
-          Choose the vehicle you'll use for deliveries
-        </Text>
+      <KeyboardAvoidingView
+        style={{flex: 1}}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          {/* Title */}
+          <Text style={styles.title}>Select Your Vehicle</Text>
+          <Text style={styles.subtitle}>
+            Choose the vehicle you'll use for deliveries
+          </Text>
 
-        {/* Vehicle Cards */}
-        <View style={styles.vehicleGrid}>
-          {vehicles.map(vehicle => (
-            <TouchableOpacity
-              key={vehicle.id}
-              style={[
-                styles.vehicleCard,
-                selectedVehicle === vehicle.id && styles.selectedCard,
-              ]}
-              onPress={() => setSelectedVehicle(vehicle.id)}
-              activeOpacity={0.7}>
-              <View style={styles.vehicleImageContainer}>
-                <Image
-                  source={vehicle.image}
-                  style={styles.vehicleImage as ImageStyle}
-                  resizeMode="contain"
-                />
-              </View>
-              <Text style={styles.vehicleName}>{vehicle.name}</Text>
-              <Text style={styles.capacityText}>{vehicle.capacity}</Text>
-
-              {selectedVehicle === vehicle.id && (
-                <View style={styles.checkmark}>
-                  <Ionicons
-                    name="checkmark"
-                    size={moderateScale(18)}
-                    color="#FFFFFF"
+          {/* Vehicle Cards */}
+          <View style={styles.vehicleGrid}>
+            {vehicles.map(vehicle => (
+              <TouchableOpacity
+                key={vehicle.id}
+                style={[
+                  styles.vehicleCard,
+                  selectedVehicle === vehicle.id && styles.selectedCard,
+                ]}
+                onPress={() => onSelectVehicle(vehicle.id)}
+                activeOpacity={0.7}>
+                <View style={styles.vehicleImageContainer}>
+                  <Image
+                    source={vehicle.image}
+                    style={styles.vehicleImage as ImageStyle}
+                    resizeMode="contain"
                   />
                 </View>
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
+                <Text style={styles.vehicleName}>{vehicle.name}</Text>
+                <Text style={styles.capacityText}>{vehicle.capacity}</Text>
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <Ionicons
-            name="information-circle"
-            size={moderateScale(22)}
-            color="#3B82F6"
-            style={styles.infoIcon}
-          />
-          <Text style={styles.infoText}>
-            You can add multiple vehicles later from your profile
-          </Text>
-        </View>
-      </ScrollView>
+                {selectedVehicle === vehicle.id && (
+                  <View style={styles.checkmark}>
+                    <Ionicons
+                      name="checkmark"
+                      size={moderateScale(18)}
+                      color="#FFFFFF"
+                    />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Vehicle Details — shown after selection */}
+          {selectedVehicle && (
+            <View style={styles.detailsSection}>
+              <Text style={styles.sectionTitle}>Vehicle Details</Text>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Vehicle Model *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Honda Activa, Tata Ace"
+                  placeholderTextColor="#999"
+                  value={vehicleModel}
+                  onChangeText={setVehicleModel}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Registration Number *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. OD-02-A-1234"
+                  placeholderTextColor="#999"
+                  value={registrationNumber}
+                  onChangeText={setRegistrationNumber}
+                  autoCapitalize="characters"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Vehicle Capacity (kg) *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 100"
+                  placeholderTextColor="#999"
+                  value={vehicleCapacity}
+                  onChangeText={setVehicleCapacity}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+          )}
+
+          {/* Info Box */}
+          <View style={styles.infoBox}>
+            <Ionicons
+              name="information-circle"
+              size={moderateScale(22)}
+              color="#3B82F6"
+              style={styles.infoIcon}
+            />
+            <Text style={styles.infoText}>
+              You can add multiple vehicles later from your profile
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Continue Button */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[
-            styles.continueButton,
-            !selectedVehicle && styles.buttonDisabled,
-          ]}
+          style={[styles.continueButton, !isFormValid && styles.buttonDisabled]}
           onPress={handleContinue}
-          disabled={!selectedVehicle}
+          disabled={!isFormValid}
           activeOpacity={0.8}>
           <Text style={styles.buttonText}>Continue</Text>
         </TouchableOpacity>
@@ -183,14 +267,13 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(2),
   },
   progressFill: {
-    width: '25%',
     height: '100%',
     backgroundColor: '#3B82F6',
     borderRadius: moderateScale(2),
   },
   scrollContent: {
     paddingHorizontal: scale(20),
-    paddingBottom: verticalScale(100),
+    paddingBottom: verticalScale(120),
   },
   title: {
     fontSize: moderateScale(isSmallDevice ? 24 : 28),
@@ -274,6 +357,35 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
+  // ─── Vehicle Details Section ──────────────────────────
+  detailsSection: {
+    marginBottom: verticalScale(20),
+  },
+  sectionTitle: {
+    fontSize: moderateScale(20),
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginBottom: verticalScale(16),
+  },
+  inputContainer: {
+    marginBottom: verticalScale(16),
+  },
+  label: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: verticalScale(8),
+  },
+  input: {
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: scale(16),
+    paddingVertical: verticalScale(14),
+    borderRadius: moderateScale(12),
+    fontSize: moderateScale(16),
+    color: '#1C1C1E',
+    minHeight: verticalScale(50),
+  },
+  // ─── Info + Footer ────────────────────────────────────
   infoBox: {
     flexDirection: 'row',
     backgroundColor: '#EFF6FF',

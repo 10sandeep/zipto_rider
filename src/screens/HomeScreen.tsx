@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,31 @@ import {
   Switch,
   Dimensions,
   Platform,
+  Alert,
+  PermissionsAndroid,
+  Modal,
+  AppState,
 } from 'react-native';
-import MapView, {Marker, PROVIDER_GOOGLE} from 'react-native-maps';
+import Geolocation from '@react-native-community/geolocation';
+import MapView, {PROVIDER_GOOGLE} from 'react-native-maps';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import {useAuthStore} from '../store/authStore';
+import {
+  getDriverProfile,
+  getDailyStats,
+  updateAvailability,
+  updateLocation,
+  getMyVehicles,
+  acceptBooking,
+} from '../services/driverService';
+import {
+  connectSocket,
+  disconnectSocket,
+  onBookingOffer,
+  offBookingOffer,
+  BookingOffer,
+} from '../services/socketService';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -24,26 +45,62 @@ const moderateScale = (size: number, factor = 0.5) =>
 
 // Responsive helpers
 const isSmallDevice = SCREEN_WIDTH < 375;
-const isMediumDevice = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
-const isLargeDevice = SCREEN_WIDTH >= 414;
 
 export default function HomeScreen({navigation}: any) {
   const [isOnline, setIsOnline] = useState(false);
-  const [currentOrder, setCurrentOrder] = useState({
-    id: 'ORD12345',
-    pickup: 'ABC Store, MG Road',
-    delivery: '123 Main St, Chennai',
-    distance: '5.2 km',
-    amount: '₹250',
-    pickupCoords: {
-      latitude: 13.0827,
-      longitude: 80.2707,
-    },
-    deliveryCoords: {
-      latitude: 13.0569,
-      longitude: 80.2425,
-    },
-  });
+  const [isToggling, setIsToggling] = useState(false);
+
+  // Real-Time Booking State
+  const [incomingBooking, setIncomingBooking] = useState<BookingOffer | null>(
+    null,
+  );
+  const [isAccepting, setIsAccepting] = useState(false);
+
+  const handleAcceptBooking = async () => {
+    if (!incomingBooking) return;
+    setIsAccepting(true);
+
+    try {
+      // 1. Fetch available active vehicles dynamically
+      const vehicles = await getMyVehicles();
+      if (!vehicles || vehicles.length === 0) {
+        Alert.alert(
+          'Error',
+          'No registered vehicle found. Please add a vehicle first.',
+        );
+        setIsAccepting(false);
+        return;
+      }
+
+      // We choose the primary / first registered vehicle id
+      const primaryVehicleId = vehicles[0].id;
+
+      const success = await acceptBooking(
+        incomingBooking.bookingId,
+        primaryVehicleId,
+      );
+      if (success) {
+        Alert.alert('Success', 'Booking accepted!');
+        setIncomingBooking(null);
+        // Navigate or refresh state context...
+      } else {
+        Alert.alert(
+          'Error',
+          'Failed to accept booking. It may have been taken by another driver.',
+        );
+        setIncomingBooking(null);
+      }
+    } catch (err) {
+      console.log('Accept booking error:', err);
+      Alert.alert('Error', 'Something went wrong.');
+    } finally {
+      setIsAccepting(false);
+    }
+  };
+
+  const handleRejectBooking = () => {
+    setIncomingBooking(null);
+  };
 
   const initialRegion = {
     latitude: 13.0827,
@@ -51,6 +108,183 @@ export default function HomeScreen({navigation}: any) {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   };
+
+  const {profile, setProfile, user} = useAuthStore();
+  const [dailyStats, setDailyStats] = useState({
+    today_earnings: 0,
+    today_orders: 0,
+  });
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      const data = await getDriverProfile();
+      setProfile(data);
+      if (data?.availability_status) {
+        setIsOnline(data.availability_status.toLowerCase() === 'online');
+      }
+    } catch (error) {
+      console.log('[HomeScreen] Failed to fetch profile:', error);
+    }
+  }, [setProfile]);
+
+  const handleToggleOnline = async (value: boolean) => {
+    if (isToggling) return;
+    setIsToggling(true);
+    // Optimistic UI update
+    setIsOnline(value);
+
+    try {
+      const status = value ? 'online' : 'offline';
+      const success = await updateAvailability({availability_status: status});
+      if (!success) {
+        // Revert on failure
+        setIsOnline(!value);
+        Alert.alert('Error', 'Failed to update availability status.');
+      }
+    } catch (error) {
+      console.log('[HomeScreen] Failed to update availability:', error);
+      // Revert on failure
+      setIsOnline(!value);
+      Alert.alert('Error', 'Failed to update availability status.');
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const stats = await getDailyStats();
+      setDailyStats({
+        today_earnings: stats.today_earnings || 0,
+        today_orders: stats.today_orders || 0,
+      });
+    } catch (error) {
+      console.log('[HomeScreen] Failed to fetch daily stats:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProfile();
+    fetchStats();
+  }, [fetchProfile, fetchStats]);
+
+  // Background Location Syncer (Only when Online)
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    const requestLocationPermission = async () => {
+      if (Platform.OS === 'ios') {
+        Geolocation.requestAuthorization();
+        return true;
+      }
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message:
+              'App needs access to your location to update your position.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          },
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    };
+
+    const syncLocation = async () => {
+      if (!isOnline) return; // Do not strictly poll location if offline
+
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        console.log('[HomeScreen] Location permission denied.');
+        return;
+      }
+
+      Geolocation.getCurrentPosition(
+        async position => {
+          const {latitude, longitude} = position.coords;
+          try {
+            await updateLocation({latitude, longitude});
+            console.log(
+              `[HomeScreen] Location synced for ST_DWithin tracking: ${latitude}, ${longitude}`,
+            );
+          } catch (error) {
+            console.log('[HomeScreen] Failed to sync location:', error);
+          }
+        },
+        error => {
+          console.log('[HomeScreen] Geolocation error:', error);
+        },
+        {enableHighAccuracy: false, timeout: 20000, maximumAge: 10000},
+      );
+    };
+
+    if (isOnline) {
+      // Force an immediate sync when toggled online
+      syncLocation();
+      // ST_DWithin Tracking Loop - 15 seconds
+      intervalId = setInterval(syncLocation, 15000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isOnline]);
+
+  // Web Socket Lifecycles
+  useEffect(() => {
+    const setupSocket = () => {
+      // If the driver turns the switch ON and we have a token, connect and listen.
+      if (isOnline) {
+        const activeToken = useAuthStore.getState().token;
+        if (activeToken) {
+          connectSocket(activeToken);
+          onBookingOffer(offer => {
+            setIncomingBooking(offer);
+          });
+        }
+      } else {
+        // Offline: tear down connections globally
+        offBookingOffer();
+        disconnectSocket();
+      }
+    };
+
+    // Initial setup
+    setupSocket();
+
+    // Reattach when coming from background back to active
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active' && isOnline) {
+        console.log(
+          '[HomeScreen] App came to foreground, restoring socket listener...',
+        );
+        // Ensure listener exists and reconnect only if socket is currently down.
+        setupSocket();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      offBookingOffer();
+      disconnectSocket();
+    };
+  }, [isOnline]);
+
+  const displayName = profile?.name || user?.name || 'Partner';
+  const firstName = displayName.split(' ')[0];
+
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   return (
     <View style={styles.container}>
@@ -62,47 +296,13 @@ export default function HomeScreen({navigation}: any) {
         style={styles.map}
         initialRegion={initialRegion}
         showsUserLocation={true}
-        showsMyLocationButton={false}>
-        {isOnline && (
-          <>
-            {/* Pickup Marker */}
-            <Marker coordinate={currentOrder.pickupCoords}>
-              <View style={styles.markerContainer}>
-                <View style={styles.pickupMarker}>
-                  <Ionicons
-                    name="location"
-                    size={moderateScale(24)}
-                    color="#FFFFFF"
-                  />
-                </View>
-                <View style={styles.markerCallout}>
-                  <Text style={styles.markerText}>Pickup</Text>
-                  <Text style={styles.markerAddress}>
-                    {currentOrder.pickup}
-                  </Text>
-                </View>
-              </View>
-            </Marker>
-
-            {/* Delivery Marker */}
-            <Marker coordinate={currentOrder.deliveryCoords}>
-              <View style={styles.deliveryMarker}>
-                <Ionicons
-                  name="flag"
-                  size={moderateScale(20)}
-                  color="#FFFFFF"
-                />
-              </View>
-            </Marker>
-          </>
-        )}
-      </MapView>
+        showsMyLocationButton={false}></MapView>
 
       {/* Header Overlay */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>Hello, Raj! 👋</Text>
-          <Text style={styles.date}>Tuesday, Jan 27, 2026</Text>
+          <Text style={styles.greeting}>Hello, {firstName}! 👋</Text>
+          <Text style={styles.date}>{currentDate}</Text>
         </View>
         <TouchableOpacity
           style={styles.notificationButton}
@@ -133,7 +333,8 @@ export default function HomeScreen({navigation}: any) {
           </View>
           <Switch
             value={isOnline}
-            onValueChange={setIsOnline}
+            onValueChange={handleToggleOnline}
+            disabled={isToggling}
             trackColor={{false: '#E0E0E0', true: '#3B82F6'}}
             thumbColor="#FFFFFF"
             style={{
@@ -145,76 +346,6 @@ export default function HomeScreen({navigation}: any) {
           />
         </View>
 
-        {/* Active Order Card */}
-        {isOnline && (
-          <View style={styles.currentOrderCard}>
-            <View style={styles.orderHeader}>
-              <View style={styles.orderHeaderLeft}>
-                <MaterialCommunityIcons
-                  name="package-variant"
-                  size={moderateScale(24)}
-                  color="#3B82F6"
-                />
-                <Text style={styles.currentOrderTitle}>Active Order</Text>
-              </View>
-              <View style={styles.amountBadge}>
-                <Text style={styles.amountText}>{currentOrder.amount}</Text>
-              </View>
-            </View>
-
-            <View style={styles.orderInfo}>
-              <View style={styles.orderRow}>
-                <Ionicons
-                  name="location"
-                  size={moderateScale(18)}
-                  color="#3B82F6"
-                />
-                <View style={styles.orderTextContainer}>
-                  <Text style={styles.orderLabel}>Pickup</Text>
-                  <Text style={styles.orderValue}>{currentOrder.pickup}</Text>
-                </View>
-              </View>
-
-              <View style={styles.dashedLine} />
-
-              <View style={styles.orderRow}>
-                <Ionicons
-                  name="flag"
-                  size={moderateScale(18)}
-                  color="#16A34A"
-                />
-                <View style={styles.orderTextContainer}>
-                  <Text style={styles.orderLabel}>Delivery</Text>
-                  <Text style={styles.orderValue}>{currentOrder.delivery}</Text>
-                </View>
-              </View>
-
-              <View style={styles.distanceRow}>
-                <MaterialCommunityIcons
-                  name="map-marker-distance"
-                  size={moderateScale(18)}
-                  color="#8E8E93"
-                />
-                <Text style={styles.distanceText}>{currentOrder.distance}</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.viewDetailsButton}
-              onPress={() =>
-                navigation.navigate('OrderDetails', {orderId: currentOrder.id})
-              }
-              activeOpacity={0.8}>
-              <Text style={styles.viewDetailsText}>View Details</Text>
-              <Ionicons
-                name="arrow-forward"
-                size={moderateScale(18)}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Stats Container */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
@@ -225,7 +356,7 @@ export default function HomeScreen({navigation}: any) {
                 color="#3B82F6"
               />
             </View>
-            <Text style={styles.statValue}>24</Text>
+            <Text style={styles.statValue}>{dailyStats.today_orders}</Text>
             <Text style={styles.statLabel}>Today's Orders</Text>
           </View>
           <View style={styles.statCard}>
@@ -236,7 +367,7 @@ export default function HomeScreen({navigation}: any) {
                 color="#16A34A"
               />
             </View>
-            <Text style={styles.statValue}>₹2,850</Text>
+            <Text style={styles.statValue}>₹{dailyStats.today_earnings}</Text>
             <Text style={styles.statLabel}>Today's Earnings</Text>
           </View>
         </View>
@@ -303,6 +434,56 @@ export default function HomeScreen({navigation}: any) {
           </View>
         </View>
       </ScrollView>
+
+      {/* Incoming Booking Modal */}
+      <Modal visible={!!incomingBooking} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>New Ride Request! 🚕</Text>
+            {incomingBooking && (
+              <>
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Pickup:</Text>
+                  <Text style={styles.modalValue}>
+                    {incomingBooking.pickup}
+                  </Text>
+                </View>
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Dropoff:</Text>
+                  <Text style={styles.modalValue}>{incomingBooking.drop}</Text>
+                </View>
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Distance:</Text>
+                  <Text style={styles.modalValue}>
+                    {incomingBooking.distance} km
+                  </Text>
+                </View>
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Est. Earnings:</Text>
+                  <Text style={styles.modalPrice}>₹{incomingBooking.fare}</Text>
+                </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.rejectButton]}
+                    onPress={handleRejectBooking}
+                    disabled={isAccepting}>
+                    <Text style={styles.rejectButtonText}>Reject</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.acceptButton]}
+                    onPress={handleAcceptBooking}
+                    disabled={isAccepting}>
+                    <Text style={styles.acceptButtonText}>
+                      {isAccepting ? 'Accepting...' : 'Accept'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -637,5 +818,78 @@ const styles = StyleSheet.create({
   markerAddress: {
     fontSize: moderateScale(11),
     color: '#6B7280',
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: moderateScale(24),
+    borderTopRightRadius: moderateScale(24),
+    padding: scale(20),
+    paddingBottom:
+      Platform.OS === 'ios' ? verticalScale(40) : verticalScale(20),
+  },
+  modalTitle: {
+    fontSize: moderateScale(22),
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: verticalScale(20),
+    textAlign: 'center',
+  },
+  modalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: verticalScale(12),
+  },
+  modalLabel: {
+    fontSize: moderateScale(16),
+    color: '#8E8E93',
+    fontWeight: '600',
+  },
+  modalValue: {
+    fontSize: moderateScale(16),
+    color: '#1C1C1E',
+    fontWeight: '700',
+    flex: 1,
+    textAlign: 'right',
+    marginLeft: scale(10),
+  },
+  modalPrice: {
+    fontSize: moderateScale(20),
+    color: '#16A34A',
+    fontWeight: '800',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: scale(12),
+    marginTop: verticalScale(24),
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: verticalScale(14),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rejectButton: {
+    backgroundColor: '#FEE2E2',
+  },
+  rejectButtonText: {
+    color: '#DC2626',
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+  },
+  acceptButton: {
+    backgroundColor: '#3B82F6',
+  },
+  acceptButtonText: {
+    color: '#FFFFFF',
+    fontSize: moderateScale(16),
+    fontWeight: '700',
   },
 });

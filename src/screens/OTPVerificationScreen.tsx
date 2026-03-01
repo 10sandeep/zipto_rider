@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, {useState, useRef, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -10,36 +10,155 @@ import {
   Platform,
   ScrollView,
   Dimensions,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import {
+  verifyOTP,
+  sendRegisterOTP,
+  sendLoginOTP,
+  getApiErrorMessage,
+} from '../services/authService';
+import {useAuthStore} from '../store/authStore';
+import {OTP_LENGTH, OTP_RESEND_COOLDOWN_SECONDS} from '../config/api.config';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
-// Responsive scaling functions
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
-const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
+const moderateScale = (size: number, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
 
-// Responsive helpers
 const isSmallDevice = SCREEN_WIDTH < 375;
-const isMediumDevice = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
-const isLargeDevice = SCREEN_WIDTH >= 414;
 
-export default function OTPVerificationScreen({ navigation, route }: any) {
-  const { phoneNumber, flow } = route.params;
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+export default function OTPVerificationScreen({navigation, route}: any) {
+  const {phoneNumber, flow} = route.params as {
+    phoneNumber: string;
+    flow: 'register' | 'login';
+  };
+
+  const initialOtp = Array(OTP_LENGTH).fill('');
+  const [otp, setOtp] = useState<string[]>(initialOtp);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(
+    OTP_RESEND_COOLDOWN_SECONDS,
+  );
+  const [canResend, setCanResend] = useState(false);
+
   const inputRefs = useRef<Array<TextInput | null>>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const setAuth = useAuthStore(state => state.setAuth);
+  const setOnboardingSubmitted = useAuthStore(
+    state => state.setOnboardingSubmitted,
+  );
+
+  const resolvePostOtpRoute = useCallback(
+    async (currentFlow: 'register' | 'login') => {
+      const {
+        getVerificationStatus,
+        getDriverProfile,
+        getMyVehicles,
+      } = require('../services/driverService');
+
+      const statusData = await getVerificationStatus();
+      console.log('[OTP] Verification status:', statusData);
+
+      if (statusData.verification_status === 'APPROVED') {
+        navigation.replace('MainTabs');
+        return;
+      }
+
+      // Registration flow always starts onboarding from first step.
+      if (currentFlow === 'register') {
+        setOnboardingSubmitted(false);
+        navigation.replace('KYCVehicleRegistration');
+        return;
+      }
+
+      // For login flow with non-approved status, decide based on onboarding completeness.
+      let hasRequiredProfileData = false;
+      let hasVehicle = false;
+
+      try {
+        const profile = await getDriverProfile();
+        hasRequiredProfileData = Boolean(
+          profile?.name?.trim() &&
+            profile?.email?.trim() &&
+            profile?.address?.trim(),
+        );
+      } catch (profileError) {
+        console.log(
+          '[OTP] Profile fetch failed while resolving route:',
+          profileError,
+        );
+      }
+
+      try {
+        const vehicles = await getMyVehicles();
+        hasVehicle = Array.isArray(vehicles) && vehicles.length > 0;
+      } catch (vehicleError) {
+        console.log(
+          '[OTP] Vehicle fetch failed while resolving route:',
+          vehicleError,
+        );
+      }
+
+      navigation.replace(
+        hasRequiredProfileData && hasVehicle
+          ? 'KYCStatus'
+          : 'KYCVehicleRegistration',
+      );
+    },
+    [navigation, setOnboardingSubmitted],
+  );
+
+  // ─── Resend countdown timer ──────────────────────────────────────────────────
+  const startResendTimer = useCallback(() => {
+    setCanResend(false);
+    setResendCooldown(OTP_RESEND_COOLDOWN_SECONDS);
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    timerRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          timerRef.current = null;
+          setCanResend(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  useEffect(() => {
+    startResendTimer();
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [startResendTimer]);
+
+  // ─── OTP input handlers ──────────────────────────────────────────────────────
   const handleOtpChange = (value: string, index: number) => {
-    if (isNaN(Number(value))) return;
+    if (isNaN(Number(value))) {
+      return;
+    }
 
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto-focus next input
-    if (value && index < 5) {
+    // Auto-focus next box
+    if (value && index < OTP_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
     }
   };
@@ -50,71 +169,125 @@ export default function OTPVerificationScreen({ navigation, route }: any) {
     }
   };
 
-  const handleVerifyOTP = () => {
+  const isOtpComplete = otp.every(digit => digit !== '');
+
+  // ─── Verify OTP ──────────────────────────────────────────────────────────────
+  const handleVerifyOTP = async () => {
     const otpCode = otp.join('');
-    if (otpCode.length === 6) {
-      // Verify OTP API call here
-      // const response = await verifyOTP(phoneNumber, otpCode);
-      
-      if (flow === 'register') {
-        // For registration, go to KYC flow
-        navigation.navigate('KYCVehicleRegistration');
-      } else {
-        // For login, go directly to main tabs (home)
-        navigation.navigate('MainTabs');
+    if (otpCode.length !== OTP_LENGTH) {
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const response = await verifyOTP(phoneNumber, otpCode, 'driver');
+      console.log('[OTP] verifyOTP response keys:', Object.keys(response));
+      console.log(
+        '[OTP] access_token exists:',
+        !!response.access_token,
+        '\nToken:',
+        response.access_token,
+      );
+
+      // Build a safe user — API returns user with snake_case fields
+      const safeUser = response.user ?? {
+        id: '',
+        phone: phoneNumber,
+        role: 'driver',
+      };
+
+      // Persist token and user in store (API uses access_token / refresh_token)
+      setAuth(response.access_token, safeUser, response.refresh_token);
+
+      try {
+        await resolvePostOtpRoute(flow);
+      } catch (err: any) {
+        console.log('[OTP] Post-OTP route resolution failed:', err.message);
+        // Safe fallback: start onboarding when route resolution fails.
+        navigation.replace('KYCVehicleRegistration');
       }
+    } catch (error) {
+      const message = getApiErrorMessage(error);
+      Alert.alert('Verification Failed', message, [{text: 'Try Again'}]);
+      // Clear OTP inputs so user can retry
+      setOtp(Array(OTP_LENGTH).fill(''));
+      setTimeout(() => inputRefs.current[0]?.focus(), 100);
+    } finally {
+      setIsVerifying(false);
     }
   };
 
-  const handleResendOTP = () => {
-    // Resend OTP API call here
-    setOtp(['', '', '', '', '', '']);
-    inputRefs.current[0]?.focus();
+  // ─── Resend OTP ──────────────────────────────────────────────────────────────
+  const handleResendOTP = async () => {
+    if (!canResend || isResending) {
+      return;
+    }
+
+    setIsResending(true);
+    try {
+      if (flow === 'register') {
+        await sendRegisterOTP(phoneNumber);
+      } else {
+        await sendLoginOTP(phoneNumber);
+      }
+
+      // Reset inputs and restart timer
+      setOtp(Array(OTP_LENGTH).fill(''));
+      setTimeout(() => inputRefs.current[0]?.focus(), 100);
+      startResendTimer();
+
+      Alert.alert('OTP Sent', `A new OTP has been sent to ${phoneNumber}.`);
+    } catch (error) {
+      const message = getApiErrorMessage(error);
+      Alert.alert('Resend Failed', message, [{text: 'OK'}]);
+    } finally {
+      setIsResending(false);
+    }
   };
 
-  const isOtpComplete = otp.every(digit => digit !== '');
-
+  // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
-      <ScrollView 
+
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Back Button - Only show if can go back */}
+        keyboardShouldPersistTaps="handled">
+        {/* Back Button */}
         {navigation.canGoBack() && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
-            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-          >
-            <Ionicons name="arrow-back" size={moderateScale(24)} color="#3B82F6" />
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            <Ionicons
+              name="arrow-back"
+              size={moderateScale(24)}
+              color="#3B82F6"
+            />
           </TouchableOpacity>
         )}
 
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.iconCircle}>
-            <MaterialCommunityIcons 
-              name="message-text-outline" 
-              size={moderateScale(isSmallDevice ? 45 : 50)} 
-              color="#3B82F6" 
+            <MaterialCommunityIcons
+              name="message-text-outline"
+              size={moderateScale(isSmallDevice ? 45 : 50)}
+              color="#3B82F6"
             />
           </View>
           <Text style={styles.titleText}>Enter OTP</Text>
           <Text style={styles.subtitleText}>
-            We've sent a 6-digit code to
+            We've sent a {OTP_LENGTH}-digit code to
           </Text>
           <Text style={styles.phoneText}>{phoneNumber}</Text>
         </View>
 
-        {/* OTP Input */}
+        {/* OTP Input Boxes */}
         <View style={styles.otpContainer}>
           {otp.map((digit, index) => (
             <TextInput
@@ -122,7 +295,8 @@ export default function OTPVerificationScreen({ navigation, route }: any) {
               ref={ref => (inputRefs.current[index] = ref)}
               style={[
                 styles.otpInput,
-                digit && styles.otpInputFilled,
+                digit ? styles.otpInputFilled : null,
+                isVerifying ? styles.otpInputDisabled : null,
               ]}
               value={digit}
               onChangeText={value => handleOtpChange(value, index)}
@@ -130,33 +304,62 @@ export default function OTPVerificationScreen({ navigation, route }: any) {
               keyboardType="number-pad"
               maxLength={1}
               selectTextOnFocus
+              editable={!isVerifying}
             />
           ))}
         </View>
 
         {/* Resend OTP */}
         <View style={styles.resendContainer}>
-          <Text style={styles.resendText}>Didn't receive the code?</Text>
-          <TouchableOpacity 
-            onPress={handleResendOTP}
-            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.resendButton}>Resend OTP</Text>
-          </TouchableOpacity>
+          {canResend ? (
+            <>
+              <Text style={styles.resendText}>Didn't receive the code?</Text>
+              <TouchableOpacity
+                onPress={handleResendOTP}
+                disabled={isResending}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                activeOpacity={0.7}>
+                {isResending ? (
+                  <ActivityIndicator
+                    color="#3B82F6"
+                    size="small"
+                    style={styles.resendLoader}
+                  />
+                ) : (
+                  <Text style={styles.resendButton}>Resend OTP</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.resendCooldownText}>
+              Resend OTP in{' '}
+              <Text style={styles.resendCooldownTimer}>{resendCooldown}s</Text>
+            </Text>
+          )}
         </View>
 
         {/* Verify Button */}
         <TouchableOpacity
           style={[
             styles.verifyButton,
-            !isOtpComplete && styles.verifyButtonDisabled,
+            (!isOtpComplete || isVerifying) && styles.verifyButtonDisabled,
           ]}
           onPress={handleVerifyOTP}
-          disabled={!isOtpComplete}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.verifyButtonText}>Verify & Continue</Text>
+          disabled={!isOtpComplete || isVerifying}
+          activeOpacity={0.8}>
+          {isVerifying ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.verifyButtonText}>Verify & Continue</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Change Number */}
+        <TouchableOpacity
+          style={styles.changeNumberButton}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}>
+          <Text style={styles.changeNumberText}>Change phone number</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -189,11 +392,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  backButtonText: {
-    fontSize: moderateScale(16),
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
   header: {
     alignItems: 'center',
     marginBottom: verticalScale(50),
@@ -211,9 +409,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
-  },
-  iconEmoji: {
-    fontSize: moderateScale(50),
   },
   titleText: {
     fontSize: moderateScale(isSmallDevice ? 28 : 32),
@@ -235,25 +430,28 @@ const styles = StyleSheet.create({
   },
   otpContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: scale(16),
     marginBottom: verticalScale(30),
-    paddingHorizontal: scale(isSmallDevice ? 0 : 5),
   },
   otpInput: {
-    width: scale(isSmallDevice ? 46 : 50),
-    height: verticalScale(56),
+    width: scale(isSmallDevice ? 60 : 68),
+    height: verticalScale(72),
     backgroundColor: '#F5F5F5',
-    borderRadius: moderateScale(12),
-    fontSize: moderateScale(24),
+    borderRadius: moderateScale(14),
+    fontSize: moderateScale(28),
     fontWeight: '700',
     color: '#1C1C1E',
     textAlign: 'center',
-    borderWidth: 2, 
+    borderWidth: 2,
     borderColor: '#F5F5F5',
   },
   otpInputFilled: {
     backgroundColor: '#EFF6FF',
     borderColor: '#3B82F6',
+  },
+  otpInputDisabled: {
+    opacity: 0.6,
   },
   resendContainer: {
     flexDirection: 'row',
@@ -262,6 +460,7 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(40),
     gap: scale(4),
     flexWrap: 'wrap',
+    minHeight: verticalScale(22),
   },
   resendText: {
     fontSize: moderateScale(14),
@@ -269,6 +468,17 @@ const styles = StyleSheet.create({
   },
   resendButton: {
     fontSize: moderateScale(14),
+    color: '#3B82F6',
+    fontWeight: '700',
+  },
+  resendLoader: {
+    marginLeft: scale(4),
+  },
+  resendCooldownText: {
+    fontSize: moderateScale(14),
+    color: '#8E8E93',
+  },
+  resendCooldownTimer: {
     color: '#3B82F6',
     fontWeight: '700',
   },
@@ -284,6 +494,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+    marginBottom: verticalScale(16),
   },
   verifyButtonDisabled: {
     backgroundColor: '#93C5FD',
@@ -294,5 +505,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: moderateScale(18),
     fontWeight: '700',
+  },
+  changeNumberButton: {
+    alignItems: 'center',
+    paddingVertical: verticalScale(10),
+  },
+  changeNumberText: {
+    fontSize: moderateScale(14),
+    color: '#8E8E93',
+    fontWeight: '500',
   },
 });

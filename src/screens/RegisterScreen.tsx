@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -11,71 +11,88 @@ import {
   ScrollView,
   Alert,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import {sendRegisterOTP, getApiErrorMessage} from '../services/authService';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
 // Responsive scaling functions
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
-const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
+const moderateScale = (size: number, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
 
 // Responsive helpers
 const isSmallDevice = SCREEN_WIDTH < 375;
-const isMediumDevice = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
-const isLargeDevice = SCREEN_WIDTH >= 414;
 
-export default function RegisterScreen({ navigation }: any) {
+export default function RegisterScreen({navigation}: any) {
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [countryCode, setCountryCode] = useState('+91');
+  const [countryCode] = useState('+91');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSendOTP = () => {
-    if (phoneNumber.length === 10) {
-      console.log('Sending OTP for registration:', countryCode + phoneNumber);
-      // Send OTP API call here for registration
-      navigation.navigate('OTPVerification', { 
-        phoneNumber: countryCode + phoneNumber,
-        flow: 'register'
+  const handleSendOTP = async () => {
+    const trimmedPhone = phoneNumber.trim();
+
+    if (trimmedPhone.length !== 10) {
+      Alert.alert(
+        'Invalid Number',
+        'Please enter a valid 10-digit mobile number.',
+      );
+      return;
+    }
+
+    const fullPhone = countryCode + trimmedPhone;
+    setIsLoading(true);
+
+    try {
+      await sendRegisterOTP(fullPhone);
+
+      // On success, navigate to OTP verification screen
+      navigation.navigate('OTPVerification', {
+        phoneNumber: fullPhone,
+        flow: 'register',
       });
-    } else {
-      Alert.alert('Invalid Number', 'Please enter a valid 10-digit phone number');
+    } catch (error) {
+      const message = getApiErrorMessage(error);
+      Alert.alert('Failed to Send OTP', message, [{text: 'OK'}]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
-      <ScrollView 
+
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Back Button - Navigate to Welcome */}
-        <TouchableOpacity 
+        keyboardShouldPersistTaps="handled">
+        {/* Back Button */}
+        <TouchableOpacity
           style={styles.backButton}
-          onPress={() => {
-            console.log('Navigating back to Welcome');
-            navigation.navigate('Welcome');
-          }}
+          onPress={() => navigation.navigate('Welcome')}
           activeOpacity={0.7}
-          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-        >
-          <Ionicons name="arrow-back" size={moderateScale(24)} color="#3B82F6" />
+          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+          <Ionicons
+            name="arrow-back"
+            size={moderateScale(24)}
+            color="#3B82F6"
+          />
         </TouchableOpacity>
 
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoCircle}>
-            <MaterialCommunityIcons 
-              name="truck-fast" 
-              size={moderateScale(isSmallDevice ? 45 : 50)} 
-              color="#3B82F6" 
+            <MaterialCommunityIcons
+              name="truck-fast"
+              size={moderateScale(isSmallDevice ? 45 : 50)}
+              color="#3B82F6"
             />
           </View>
           <Text style={styles.welcomeText}>Create Account</Text>
@@ -101,24 +118,29 @@ export default function RegisterScreen({ navigation }: any) {
               value={phoneNumber}
               onChangeText={setPhoneNumber}
               autoFocus
+              editable={!isLoading}
             />
           </View>
         </View>
 
-        {/* Continue Button */}
+        {/* Send OTP Button */}
         <TouchableOpacity
           style={[
             styles.continueButton,
-            phoneNumber.length !== 10 && styles.continueButtonDisabled,
+            (phoneNumber.length !== 10 || isLoading) &&
+              styles.continueButtonDisabled,
           ]}
           onPress={handleSendOTP}
-          disabled={phoneNumber.length !== 10}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.continueButtonText}>Send OTP</Text>
+          disabled={phoneNumber.length !== 10 || isLoading}
+          activeOpacity={0.8}>
+          {isLoading ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.continueButtonText}>Send OTP</Text>
+          )}
         </TouchableOpacity>
 
-        {/* Terms and Conditions */}
+        {/* Terms */}
         <Text style={styles.termsText}>
           By continuing, you agree to our{' '}
           <Text style={styles.linkText}>Terms of Service</Text> and{' '}
@@ -155,11 +177,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  backButtonText: {
-    fontSize: moderateScale(16),
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
   header: {
     alignItems: 'center',
     marginBottom: verticalScale(50),
@@ -177,9 +194,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
-  },
-  logoEmoji: {
-    fontSize: moderateScale(50),
   },
   welcomeText: {
     fontSize: moderateScale(isSmallDevice ? 28 : 32),
