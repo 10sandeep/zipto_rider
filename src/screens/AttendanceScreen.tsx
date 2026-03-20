@@ -288,6 +288,7 @@ const styles = StyleSheet.create({
     elevation: 2
   },
   legendTitle: { 
+    fontFamily:"poppins-regular",
     fontSize: moderateScale(16), 
     fontWeight: '700', 
     color: '#1C1C1E', 

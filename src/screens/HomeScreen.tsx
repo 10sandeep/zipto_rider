@@ -40,8 +40,7 @@ const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 // Responsive scaling functions
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
-const moderateScale = (size: number, factor = 0.5) =>
-  size + (scale(size) - size) * factor;
+const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
 
 // Responsive helpers
 const isSmallDevice = SCREEN_WIDTH < 375;
@@ -296,7 +295,31 @@ export default function HomeScreen({navigation}: any) {
         style={styles.map}
         initialRegion={initialRegion}
         showsUserLocation={true}
-        showsMyLocationButton={false}></MapView>
+        showsMyLocationButton={false}>
+        {isOnline && (
+          <>
+            {/* Pickup Marker */}
+            <Marker coordinate={currentOrder.pickupCoords}>
+              <View style={styles.markerContainer}>
+                <View style={styles.pickupMarker}>
+                  <Ionicons name="location" size={moderateScale(24)} color="#FFFFFF" />
+                </View>
+                <View style={styles.markerCallout}>
+                  <Text style={styles.markerText}>Pickup</Text>
+                  <Text style={styles.markerAddress}>{currentOrder.pickup}</Text>
+                </View>
+              </View>
+            </Marker>
+
+            {/* Delivery Marker */}
+            <Marker coordinate={currentOrder.deliveryCoords}>
+              <View style={styles.deliveryMarker}>
+                <Ionicons name="flag" size={moderateScale(20)} color="#FFFFFF" />
+              </View>
+            </Marker>
+          </>
+        )}
+      </MapView>
 
       {/* Header Overlay */}
       <View style={styles.header}>
@@ -309,11 +332,7 @@ export default function HomeScreen({navigation}: any) {
           onPress={() => navigation.navigate('Notifications')}
           activeOpacity={0.7}
           hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-          <Ionicons
-            name="notifications-outline"
-            size={moderateScale(24)}
-            color="#3B82F6"
-          />
+          <Ionicons name="notifications-outline" size={moderateScale(24)} color="#3B82F6" />
           <View style={styles.badge} />
         </TouchableOpacity>
       </View>
@@ -337,14 +356,67 @@ export default function HomeScreen({navigation}: any) {
             disabled={isToggling}
             trackColor={{false: '#E0E0E0', true: '#3B82F6'}}
             thumbColor="#FFFFFF"
-            style={{
-              transform: [
-                {scaleX: Platform.OS === 'ios' ? 0.9 : 1},
-                {scaleY: Platform.OS === 'ios' ? 0.9 : 1},
-              ],
-            }}
+            style={{transform: [{scaleX: Platform.OS === 'ios' ? 0.9 : 1}, {scaleY: Platform.OS === 'ios' ? 0.9 : 1}]}}
           />
         </View>
+
+        {/* Active Order Card */}
+        {isOnline && (
+          <View style={styles.currentOrderCard}>
+            <View style={styles.orderHeader}>
+              <View style={styles.orderHeaderLeft}>
+                <MaterialCommunityIcons
+                  name="package-variant"
+                  size={moderateScale(24)}
+                  color="#3B82F6"
+                />
+                <Text style={styles.currentOrderTitle}>Active Order</Text>
+              </View>
+              <View style={styles.amountBadge}>
+                <Text style={styles.amountText}>{currentOrder.amount}</Text>
+              </View>
+            </View>
+
+            <View style={styles.orderInfo}>
+              <View style={styles.orderRow}>
+                <Ionicons name="location" size={moderateScale(18)} color="#3B82F6" />
+                <View style={styles.orderTextContainer}>
+                  <Text style={styles.orderLabel}>Pickup</Text>
+                  <Text style={styles.orderValue}>{currentOrder.pickup}</Text>
+                </View>
+              </View>
+
+              <View style={styles.dashedLine} />
+
+              <View style={styles.orderRow}>
+                <Ionicons name="flag" size={moderateScale(18)} color="#16A34A" />
+                <View style={styles.orderTextContainer}>
+                  <Text style={styles.orderLabel}>Delivery</Text>
+                  <Text style={styles.orderValue}>{currentOrder.delivery}</Text>
+                </View>
+              </View>
+
+              <View style={styles.distanceRow}>
+                <MaterialCommunityIcons
+                  name="map-marker-distance"
+                  size={moderateScale(18)}
+                  color="#8E8E93"
+                />
+                <Text style={styles.distanceText}>{currentOrder.distance}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.viewDetailsButton}
+              onPress={() =>
+                navigation.navigate('OrderDetails', {orderId: currentOrder.id})
+              }
+              activeOpacity={0.8}>
+              <Text style={styles.viewDetailsText}>View Details</Text>
+              <Ionicons name="arrow-forward" size={moderateScale(18)} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Stats Container */}
         <View style={styles.statsContainer}>
@@ -361,76 +433,10 @@ export default function HomeScreen({navigation}: any) {
           </View>
           <View style={styles.statCard}>
             <View style={styles.statIconContainer}>
-              <Ionicons
-                name="wallet-outline"
-                size={moderateScale(28)}
-                color="#16A34A"
-              />
+              <Ionicons name="wallet-outline" size={moderateScale(28)} color="#16A34A" />
             </View>
             <Text style={styles.statValue}>₹{dailyStats.today_earnings}</Text>
             <Text style={styles.statLabel}>Today's Earnings</Text>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => navigation.navigate('Attendance')}
-              activeOpacity={0.7}>
-              <View style={styles.actionIconContainer}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={moderateScale(28)}
-                  color="#3B82F6"
-                />
-              </View>
-              <Text style={styles.actionLabel}>Attendance</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => navigation.navigate('Support')}
-              activeOpacity={0.7}>
-              <View style={styles.actionIconContainer}>
-                <Ionicons
-                  name="chatbubble-ellipses-outline"
-                  size={moderateScale(28)}
-                  color="#3B82F6"
-                />
-              </View>
-              <Text style={styles.actionLabel}>Support</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => navigation.navigate('RatingsReviews')}
-              activeOpacity={0.7}>
-              <View style={styles.actionIconContainer}>
-                <Ionicons
-                  name="star-outline"
-                  size={moderateScale(28)}
-                  color="#3B82F6"
-                />
-              </View>
-              <Text style={styles.actionLabel}>Ratings</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => navigation.navigate('Settings')}
-              activeOpacity={0.7}>
-              <View style={styles.actionIconContainer}>
-                <Ionicons
-                  name="settings-outline"
-                  size={moderateScale(28)}
-                  color="#3B82F6"
-                />
-              </View>
-              <Text style={styles.actionLabel}>Settings</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -721,48 +727,6 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     textAlign: 'center',
   },
-  quickActions: {
-    marginTop: verticalScale(24),
-  },
-  sectionTitle: {
-    fontSize: moderateScale(18),
-    fontWeight: '700',
-    color: '#1C1C1E',
-    marginBottom: verticalScale(16),
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: scale(12),
-  },
-  actionCard: {
-    width: (SCREEN_WIDTH - scale(52)) / 2,
-    backgroundColor: '#FFFFFF',
-    padding: scale(20),
-    borderRadius: moderateScale(16),
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    minHeight: verticalScale(130),
-    justifyContent: 'center',
-  },
-  actionIconContainer: {
-    width: moderateScale(56),
-    height: moderateScale(56),
-    borderRadius: moderateScale(28),
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: verticalScale(12),
-  },
-  actionLabel: {
-    fontSize: moderateScale(14),
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
   // Map Marker Styles
   markerContainer: {
     alignItems: 'center',
@@ -819,6 +783,7 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(11),
     color: '#6B7280',
   },
+
 
   // Modal Styles
   modalOverlay: {
@@ -893,3 +858,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

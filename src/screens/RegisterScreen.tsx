@@ -252,19 +252,21 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
     minHeight: verticalScale(54),
   },
+
+  // ─── Send OTP Button (reduced size) ───────────────────────────────────────
   continueButton: {
     backgroundColor: '#3B82F6',
-    paddingVertical: verticalScale(18),
-    borderRadius: moderateScale(15),
+    paddingVertical: verticalScale(12),       // was 18
+    borderRadius: moderateScale(12),           // was 15
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: verticalScale(20),
-    minHeight: verticalScale(54),
+    marginBottom: verticalScale(16),           // was 20
+    minHeight: verticalScale(44),              // was 54
     shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: {width: 0, height: 3},       // was 4
+    shadowOpacity: 0.25,                       // was 0.3
+    shadowRadius: 6,                           // was 8
+    elevation: 3,                              // was 4
   },
   continueButtonDisabled: {
     backgroundColor: '#93C5FD',
@@ -273,9 +275,11 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     color: '#FFFFFF',
-    fontSize: moderateScale(18),
+    fontSize: moderateScale(15),               // was 18
     fontWeight: '700',
   },
+  // ──────────────────────────────────────────────────────────────────────────
+
   termsText: {
     fontSize: moderateScale(13),
     color: '#8E8E93',

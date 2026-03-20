@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   headerTitle: { 
+    fontFamily:"poppin-regular",
     fontSize: moderateScale(18), 
     fontWeight: '700', 
     color: '#1C1C1E' 

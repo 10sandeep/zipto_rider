@@ -62,15 +62,16 @@ export default function OnboardingScreen({ navigation }: any) {
       <ImageBackground
         source={item.image}
         style={styles.backgroundImage}
-        resizeMode="cover"
+        resizeMode="contain"
+        imageStyle={styles.backgroundImageStyle}
       >
         {/* Gradient Overlay */}
         <LinearGradient
           colors={[
             'rgba(0, 0, 0, 0)',
-            'rgba(0, 0, 0, 0.2)',
-            'rgba(0, 0, 0, 0.5)',
-            'rgba(0, 0, 0, 0.8)',
+            'rgba(0, 0, 0, 0.1)',
+            'rgba(0, 0, 0, 0.4)',
+            'rgba(0, 0, 0, 0.75)',
             'rgba(0, 0, 0, 0.95)',
           ]}
           style={styles.gradientOverlay}
@@ -164,11 +165,18 @@ const styles = StyleSheet.create({
   slide: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
+    backgroundColor: '#000000',
   },
   backgroundImage: {
     flex: 1,
     width: '100%',
     height: '100%',
+  },
+  backgroundImageStyle: {
+    height: SCREEN_HEIGHT * 0.78,
+    top: 0,
+    width: '100%',
+    resizeMode: 'cover',
   },
   gradientOverlay: {
     flex: 1,
@@ -220,6 +228,7 @@ const styles = StyleSheet.create({
   },
   nextButtonText: {
     color: '#FFFFFF',
+    fontFamily:"poppins-regular",
     fontSize: moderateScale(18),
     fontWeight: '700',
   },
