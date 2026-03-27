@@ -82,6 +82,7 @@ const SplashScreen = () => {
     isHydrated,
     profile,
     onboardingSubmitted,
+    hasSeenOnboarding,
     setProfile,
     setOnboardingSubmitted,
   } = useAuthStore();
@@ -103,8 +104,9 @@ const SplashScreen = () => {
 
     const hasJwt = Boolean(token);
     if (!isAuthenticated && !hasJwt) {
-      console.log('[SplashScreen] Not authenticated, routing to Onboarding');
-      setNextRoute('Onboarding');
+      const dest = hasSeenOnboarding ? 'Welcome' : 'Onboarding';
+      console.log('[SplashScreen] Not authenticated, routing to', dest);
+      setNextRoute(dest);
       return;
     }
 
@@ -204,6 +206,12 @@ const SplashScreen = () => {
           return;
         }
 
+        // 401 means both access and refresh tokens are expired -> force re-login.
+        if (statusCode === 401) {
+          setNextRoute('Welcome');
+          return;
+        }
+
         // Fallback to cached profile if offline or other error
         if (cachedProfile?.verification_status === 'APPROVED') {
           setNextRoute('MainTabs');
@@ -222,6 +230,7 @@ const SplashScreen = () => {
     isHydrated,
     isAuthenticated,
     token,
+    hasSeenOnboarding,
     setProfile,
     setOnboardingSubmitted,
     onboardingSubmitted,

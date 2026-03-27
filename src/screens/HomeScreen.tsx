@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,18 @@ import {
   PermissionsAndroid,
   Modal,
   AppState,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import MapView, {PROVIDER_GOOGLE} from 'react-native-maps';
+import Sound from 'react-native-sound';
+
+Sound.setCategory('Playback');
+const bookingAlertSound = new Sound('booking_alert.wav', Sound.MAIN_BUNDLE, err => {
+  if (err) {
+    // Sound failed to load — silent fallback
+  }
+});
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useAuthStore} from '../store/authStore';
@@ -26,14 +35,20 @@ import {
   updateLocation,
   getMyVehicles,
   acceptBooking,
+  getNotifications,
 } from '../services/driverService';
 import {
   connectSocket,
   disconnectSocket,
   onBookingOffer,
   offBookingOffer,
+  onOfferExpired,
+  offOfferExpired,
+  onNoDriversFound,
+  offNoDriversFound,
   BookingOffer,
 } from '../services/socketService';
+import {rejectBooking} from '../services/driverService';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -46,61 +61,145 @@ const moderateScale = (size: number, factor = 0.5) =>
 // Responsive helpers
 const isSmallDevice = SCREEN_WIDTH < 375;
 
+// ─── Swipe-to-Accept Slider ───────────────────────────────────────────────────
+const THUMB_SIZE = moderateScale(56);
+
+const SwipeToAccept = ({
+  onAccept,
+  disabled,
+}: {
+  onAccept: () => void;
+  disabled: boolean;
+}) => {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const containerWidthRef = useRef(0);
+  const disabledRef = useRef(disabled);
+  const onAcceptRef = useRef(onAccept);
+  disabledRef.current = disabled;
+  onAcceptRef.current = onAccept;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !disabledRef.current,
+      onMoveShouldSetPanResponder: (_, gs) =>
+        !disabledRef.current && gs.dx > 2,
+      onPanResponderMove: (_, gs) => {
+        const maxX = containerWidthRef.current - THUMB_SIZE - 8;
+        translateX.setValue(Math.max(0, Math.min(gs.dx, maxX)));
+      },
+      onPanResponderRelease: (_, gs) => {
+        const maxX = containerWidthRef.current - THUMB_SIZE - 8;
+        if (gs.dx >= maxX * 0.75) {
+          Animated.timing(translateX, {
+            toValue: maxX,
+            duration: 150,
+            useNativeDriver: true,
+          }).start(() => {
+            onAcceptRef.current();
+            translateX.setValue(0);
+          });
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            friction: 5,
+          }).start();
+        }
+      },
+    }),
+  ).current;
+
+  return (
+    <View
+      style={styles.sliderContainer}
+      onLayout={e => {
+        containerWidthRef.current = e.nativeEvent.layout.width;
+      }}>
+      <View style={styles.sliderTrack}>
+        <Text style={styles.sliderText}>SLIDE TO ACCEPT  »</Text>
+      </View>
+      <Animated.View
+        style={[styles.sliderThumb, {transform: [{translateX}]}]}
+        {...panResponder.panHandlers}>
+        <Ionicons name="chevron-forward" size={moderateScale(26)} color="#FFFFFF" />
+      </Animated.View>
+    </View>
+  );
+};
+
 export default function HomeScreen({navigation}: any) {
   const [isOnline, setIsOnline] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [hasApprovedVehicle, setHasApprovedVehicle] = useState<boolean | null>(null);
 
   // Real-Time Booking State
   const [incomingBooking, setIncomingBooking] = useState<BookingOffer | null>(
     null,
   );
   const [isAccepting, setIsAccepting] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearCountdown = useCallback(() => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setCountdown(0);
+  }, []);
+
+  const dismissOffer = useCallback(() => {
+    clearCountdown();
+    setIncomingBooking(null);
+  }, [clearCountdown]);
 
   const handleAcceptBooking = async () => {
     if (!incomingBooking) return;
+
+    // Optimistic: dismiss immediately so driver sees instant feedback
+    const bookingSnapshot = incomingBooking;
+    dismissOffer();
     setIsAccepting(true);
 
     try {
-      // 1. Fetch available active vehicles dynamically
       const vehicles = await getMyVehicles();
       if (!vehicles || vehicles.length === 0) {
         Alert.alert(
-          'Error',
+          'No Vehicle',
           'No registered vehicle found. Please add a vehicle first.',
         );
-        setIsAccepting(false);
         return;
       }
 
-      // We choose the primary / first registered vehicle id
       const primaryVehicleId = vehicles[0].id;
-
-      const success = await acceptBooking(
-        incomingBooking.bookingId,
+      const result = await acceptBooking(
+        bookingSnapshot.bookingId,
         primaryVehicleId,
       );
-      if (success) {
-        Alert.alert('Success', 'Booking accepted!');
-        setIncomingBooking(null);
-        // Navigate or refresh state context...
+
+      if (typeof result !== 'string') {
+        fetchStats();
+        navigation.navigate('Navigation', {bookingId: result.realBookingId});
       } else {
-        Alert.alert(
-          'Error',
-          'Failed to accept booking. It may have been taken by another driver.',
-        );
-        setIncomingBooking(null);
+        Alert.alert('Could Not Accept', result);
       }
     } catch (err) {
-      console.log('Accept booking error:', err);
-      Alert.alert('Error', 'Something went wrong.');
+      console.log('[HomeScreen] Accept booking error:', err);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setIsAccepting(false);
     }
   };
 
-  const handleRejectBooking = () => {
-    setIncomingBooking(null);
-  };
+  const handleRejectBooking = useCallback(async () => {
+    if (!incomingBooking) return;
+    const bookingId = incomingBooking.bookingId;
+    dismissOffer();
+    // Fire-and-forget: tell backend to move to next driver immediately
+    rejectBooking(bookingId).then(err => {
+      if (err) console.log('[HomeScreen] Reject booking error:', err);
+    });
+  }, [incomingBooking, dismissOffer]);
 
   const initialRegion = {
     latitude: 13.0827,
@@ -110,6 +209,7 @@ export default function HomeScreen({navigation}: any) {
   };
 
   const {profile, setProfile, user} = useAuthStore();
+  const [hasUnread, setHasUnread] = useState(false);
   const [dailyStats, setDailyStats] = useState({
     today_earnings: 0,
     today_orders: 0,
@@ -117,11 +217,18 @@ export default function HomeScreen({navigation}: any) {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const data = await getDriverProfile();
+      const [data, vehicles] = await Promise.all([
+        getDriverProfile(),
+        getMyVehicles().catch(() => []),
+      ]);
       setProfile(data);
       if (data?.availability_status) {
         setIsOnline(data.availability_status.toLowerCase() === 'online');
       }
+      const approved = vehicles.some(
+        v => v.verification_status?.toUpperCase() === 'APPROVED',
+      );
+      setHasApprovedVehicle(approved);
     } catch (error) {
       console.log('[HomeScreen] Failed to fetch profile:', error);
     }
@@ -129,6 +236,17 @@ export default function HomeScreen({navigation}: any) {
 
   const handleToggleOnline = async (value: boolean) => {
     if (isToggling) return;
+
+    // Block going online if no approved vehicle
+    if (value && !hasApprovedVehicle) {
+      Alert.alert(
+        'Vehicle Not Verified',
+        'You cannot go online until your vehicle has been verified by the admin. Please wait for approval.',
+        [{text: 'OK'}],
+      );
+      return;
+    }
+
     setIsToggling(true);
     // Optimistic UI update
     setIsOnline(value);
@@ -166,7 +284,40 @@ export default function HomeScreen({navigation}: any) {
   useEffect(() => {
     fetchProfile();
     fetchStats();
+    getNotifications()
+      .then(notifs => setHasUnread(notifs.some(n => !n.read)))
+      .catch(() => {});
   }, [fetchProfile, fetchStats]);
+
+  // Countdown timer — starts fresh on each new offer, auto-dismisses at 0
+  useEffect(() => {
+    if (!incomingBooking) {
+      clearCountdown();
+      return;
+    }
+    const seconds = incomingBooking.timeLeft > 0 ? incomingBooking.timeLeft : 30;
+    setCountdown(seconds);
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownRef.current!);
+          countdownRef.current = null;
+          // Offer expired on client side — dismiss silently (server handles next driver)
+          setIncomingBooking(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    };
+    // Re-run only when a new offer arrives (bookingId changes)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomingBooking?.bookingId]);
 
   // Background Location Syncer (Only when Online)
   useEffect(() => {
@@ -239,18 +390,25 @@ export default function HomeScreen({navigation}: any) {
   // Web Socket Lifecycles
   useEffect(() => {
     const setupSocket = () => {
-      // If the driver turns the switch ON and we have a token, connect and listen.
       if (isOnline) {
         const activeToken = useAuthStore.getState().token;
         if (activeToken) {
           connectSocket(activeToken);
           onBookingOffer(offer => {
             setIncomingBooking(offer);
+            bookingAlertSound.stop(() => {
+              bookingAlertSound.play();
+            });
+          });
+          onOfferExpired(_bookingId => dismissOffer());
+          onNoDriversFound(_bookingId => {
+            // No-op for driver side — server already handles this
           });
         }
       } else {
-        // Offline: tear down connections globally
         offBookingOffer();
+        offOfferExpired();
+        offNoDriversFound();
         disconnectSocket();
       }
     };
@@ -264,7 +422,6 @@ export default function HomeScreen({navigation}: any) {
         console.log(
           '[HomeScreen] App came to foreground, restoring socket listener...',
         );
-        // Ensure listener exists and reconnect only if socket is currently down.
         setupSocket();
       }
     });
@@ -272,9 +429,11 @@ export default function HomeScreen({navigation}: any) {
     return () => {
       subscription.remove();
       offBookingOffer();
+      offOfferExpired();
+      offNoDriversFound();
       disconnectSocket();
     };
-  }, [isOnline]);
+  }, [isOnline, dismissOffer]);
 
   const displayName = profile?.name || user?.name || 'Partner';
   const firstName = displayName.split(' ')[0];
@@ -290,15 +449,7 @@ export default function HomeScreen({navigation}: any) {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Map Background */}
-      <MapView
-        provider={PROVIDER_GOOGLE}
-        style={styles.map}
-        initialRegion={initialRegion}
-        showsUserLocation={true}
-        showsMyLocationButton={false}></MapView>
-
-      {/* Header Overlay */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.greeting}>Hello, {firstName}! 👋</Text>
@@ -314,11 +465,10 @@ export default function HomeScreen({navigation}: any) {
             size={moderateScale(24)}
             color="#3B82F6"
           />
-          <View style={styles.badge} />
+          {hasUnread && <View style={styles.badge} />}
         </TouchableOpacity>
       </View>
 
-      {/* Content Overlay */}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
@@ -328,7 +478,11 @@ export default function HomeScreen({navigation}: any) {
           <View style={styles.onlineCardLeft}>
             <Text style={styles.onlineTitle}>Go Online</Text>
             <Text style={styles.onlineSubtitle}>
-              {isOnline ? 'Accepting orders' : 'Start accepting orders'}
+              {isOnline
+                ? 'Accepting orders'
+                : hasApprovedVehicle === false
+                ? 'Vehicle not verified yet'
+                : 'Start accepting orders'}
             </Text>
           </View>
           <Switch
@@ -345,6 +499,16 @@ export default function HomeScreen({navigation}: any) {
             }}
           />
         </View>
+
+        {/* Vehicle not verified warning */}
+        {hasApprovedVehicle === false && (
+          <View style={styles.vehicleWarningBanner}>
+            <Ionicons name="warning-outline" size={moderateScale(16)} color="#E65100" />
+            <Text style={styles.vehicleWarningText}>
+              Your vehicle is pending verification. You can go online once the admin approves it.
+            </Text>
+          </View>
+        )}
 
         {/* Stats Container */}
         <View style={styles.statsContainer}>
@@ -439,47 +603,135 @@ export default function HomeScreen({navigation}: any) {
       <Modal visible={!!incomingBooking} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>New Ride Request! 🚕</Text>
+            {/* Progress bar — full width at the very top */}
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${(countdown / (incomingBooking?.timeLeft || 30)) * 100}%` as any,
+                    backgroundColor: countdown <= 10 ? '#FF3B30' : '#007AFF',
+                  },
+                ]}
+              />
+            </View>
+
             {incomingBooking && (
-              <>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Pickup:</Text>
-                  <Text style={styles.modalValue}>
-                    {incomingBooking.pickup}
-                  </Text>
-                </View>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Dropoff:</Text>
-                  <Text style={styles.modalValue}>{incomingBooking.drop}</Text>
-                </View>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Distance:</Text>
-                  <Text style={styles.modalValue}>
-                    {incomingBooking.distance} km
-                  </Text>
-                </View>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Est. Earnings:</Text>
-                  <Text style={styles.modalPrice}>₹{incomingBooking.fare}</Text>
+              <View style={styles.modalContent}>
+                {/* Header: title + vehicle type | countdown badge */}
+                <View style={styles.modalHeader}>
+                  <View>
+                    <Text style={styles.modalTitle}>New Delivery Request!</Text>
+                    {incomingBooking.vehicleType && (
+                      <Text style={styles.vehicleTypeText}>
+                        {incomingBooking.vehicleType
+                          .replace('_', ' ')
+                          .toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  <View
+                    style={[
+                      styles.countdownBadge,
+                      countdown <= 10 && styles.countdownUrgentBadge,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.countdownText,
+                        countdown <= 10 && styles.countdownUrgentText,
+                      ]}>
+                      {countdown}s
+                    </Text>
+                  </View>
                 </View>
 
+                {/* Location details card */}
+                <View style={styles.detailsCard}>
+                  {/* Pickup row */}
+                  <View style={styles.modalRow}>
+                    <View>
+                      <View style={styles.dotPickup} />
+                      <View style={styles.connectingLine} />
+                    </View>
+                    <View style={styles.locationTextContainer}>
+                      <Text style={styles.modalLabel}>Pickup</Text>
+                      <Text style={styles.modalValue} numberOfLines={2}>
+                        {incomingBooking.pickup}
+                      </Text>
+                    </View>
+                  </View>
+                  {/* Dropoff row */}
+                  <View style={styles.modalRow}>
+                    <View style={styles.dotDropoff} />
+                    <View style={styles.locationTextContainer}>
+                      <Text style={styles.modalLabel}>Dropoff</Text>
+                      <Text style={styles.modalValue} numberOfLines={2}>
+                        {incomingBooking.drop}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Stats: distance | earnings */}
+                <View style={styles.statsRow}>
+                  <View style={styles.statBox}>
+                    <Text style={styles.modalLabel}>Distance</Text>
+                    <Text style={styles.statValue}>
+                      {incomingBooking.distance} km
+                    </Text>
+                  </View>
+                  <View style={styles.verticalDivider} />
+                  <View style={styles.statBox}>
+                    <Text style={styles.earningsLabel}>Your Earnings</Text>
+                    <Text style={styles.modalPrice}>
+                      ₹{incomingBooking.fare}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Paid by badge */}
+                <View style={[
+                  styles.paidByOfferBadge,
+                  incomingBooking.paid_by === 'receiver'
+                    ? {backgroundColor: '#EDE9FE'}
+                    : {backgroundColor: '#E0F2FE'},
+                ]}>
+                  <Ionicons
+                    name={incomingBooking.paid_by === 'receiver' ? 'person-outline' : 'person'}
+                    size={moderateScale(14)}
+                    color={incomingBooking.paid_by === 'receiver' ? '#7C3AED' : '#0369A1'}
+                  />
+                  <Text style={[
+                    styles.paidByOfferText,
+                    {color: incomingBooking.paid_by === 'receiver' ? '#7C3AED' : '#0369A1'},
+                  ]}>
+                    {incomingBooking.paid_by === 'receiver'
+                      ? 'Receiver Pays'
+                      : 'Sender Pays'}
+                  </Text>
+                </View>
+
+                {/* Actions: circular reject + swipe to accept */}
                 <View style={styles.modalActions}>
                   <TouchableOpacity
-                    style={[styles.modalButton, styles.rejectButton]}
+                    style={styles.rejectButton}
                     onPress={handleRejectBooking}
-                    disabled={isAccepting}>
-                    <Text style={styles.rejectButtonText}>Reject</Text>
+                    disabled={isAccepting}
+                    activeOpacity={0.7}>
+                    <Ionicons
+                      name="close"
+                      size={moderateScale(28)}
+                      color="#FF3B30"
+                    />
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.acceptButton]}
-                    onPress={handleAcceptBooking}
-                    disabled={isAccepting}>
-                    <Text style={styles.acceptButtonText}>
-                      {isAccepting ? 'Accepting...' : 'Accept'}
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={styles.sliderWrapper}>
+                    <SwipeToAccept
+                      onAccept={handleAcceptBooking}
+                      disabled={isAccepting}
+                    />
+                  </View>
                 </View>
-              </>
+              </View>
             )}
           </View>
         </View>
@@ -492,15 +744,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
-  },
-  map: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
   },
   header: {
     flexDirection: 'row',
@@ -582,6 +825,23 @@ const styles = StyleSheet.create({
   onlineSubtitle: {
     fontSize: moderateScale(14),
     color: '#8E8E93',
+  },
+  vehicleWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF3E0',
+    borderRadius: moderateScale(10),
+    padding: scale(12),
+    marginTop: verticalScale(8),
+    gap: scale(8),
+    borderLeftWidth: 3,
+    borderLeftColor: '#E65100',
+  },
+  vehicleWarningText: {
+    flex: 1,
+    fontSize: moderateScale(13),
+    color: '#E65100',
+    lineHeight: moderateScale(18),
   },
   currentOrderCard: {
     backgroundColor: '#FFFFFF',
@@ -830,66 +1090,198 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: moderateScale(24),
     borderTopRightRadius: moderateScale(24),
-    padding: scale(20),
+    overflow: 'hidden',
     paddingBottom:
       Platform.OS === 'ios' ? verticalScale(40) : verticalScale(20),
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: -2},
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  progressTrack: {
+    height: verticalScale(6),
+    backgroundColor: '#E5E5EA',
+    width: '100%',
+  },
+  progressFill: {
+    height: '100%',
+  },
+  modalContent: {
+    padding: scale(24),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: verticalScale(20),
   },
   modalTitle: {
     fontSize: moderateScale(22),
     fontWeight: '800',
     color: '#1C1C1E',
-    marginBottom: verticalScale(20),
-    textAlign: 'center',
+  },
+  vehicleTypeText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginTop: verticalScale(4),
+  },
+  countdownBadge: {
+    backgroundColor: '#E5F1FF',
+    paddingHorizontal: scale(16),
+    paddingVertical: verticalScale(8),
+    borderRadius: moderateScale(20),
+  },
+  countdownUrgentBadge: {
+    backgroundColor: '#FFEBEA',
+  },
+  countdownText: {
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+    color: '#007AFF',
+  },
+  countdownUrgentText: {
+    color: '#FF3B30',
+  },
+  detailsCard: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: moderateScale(16),
+    padding: scale(16),
+    marginBottom: verticalScale(16),
   },
   modalRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: verticalScale(12),
+    alignItems: 'flex-start',
+    marginBottom: verticalScale(4),
+  },
+  locationTextContainer: {
+    flex: 1,
+    marginLeft: scale(12),
+  },
+  dotPickup: {
+    width: moderateScale(12),
+    height: moderateScale(12),
+    borderRadius: moderateScale(6),
+    backgroundColor: '#34C759',
+    marginTop: verticalScale(4),
+  },
+  dotDropoff: {
+    width: moderateScale(12),
+    height: moderateScale(12),
+    backgroundColor: '#FF3B30',
+    marginTop: verticalScale(4),
+  },
+  connectingLine: {
+    width: 2,
+    height: verticalScale(20),
+    backgroundColor: '#D1D1D6',
+    marginLeft: moderateScale(5),
+    marginVertical: verticalScale(4),
   },
   modalLabel: {
-    fontSize: moderateScale(16),
-    color: '#8E8E93',
+    fontSize: moderateScale(12),
     fontWeight: '600',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   modalValue: {
     fontSize: moderateScale(16),
+    fontWeight: '500',
     color: '#1C1C1E',
-    fontWeight: '700',
+    marginTop: verticalScale(2),
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
+    borderRadius: moderateScale(16),
+    padding: scale(16),
+    marginBottom: verticalScale(24),
+  },
+  statBox: {
     flex: 1,
-    textAlign: 'right',
-    marginLeft: scale(10),
+  },
+  verticalDivider: {
+    width: 1,
+    height: verticalScale(30),
+    backgroundColor: '#D1D1D6',
+    marginHorizontal: scale(16),
+  },
+  earningsLabel: {
+    fontSize: moderateScale(12),
+    fontWeight: '600',
+    color: '#34C759',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   modalPrice: {
-    fontSize: moderateScale(20),
-    color: '#16A34A',
+    fontSize: moderateScale(24),
     fontWeight: '800',
+    color: '#34C759',
+    marginTop: verticalScale(4),
+  },
+  paidByOfferBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scale(6),
+    paddingVertical: verticalScale(8),
+    borderRadius: moderateScale(8),
+    marginBottom: verticalScale(8),
+  },
+  paidByOfferText: {
+    fontSize: moderateScale(12),
+    fontWeight: '700',
   },
   modalActions: {
     flexDirection: 'row',
-    gap: scale(12),
-    marginTop: verticalScale(24),
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: verticalScale(14),
-    borderRadius: moderateScale(12),
     alignItems: 'center',
-    justifyContent: 'center',
   },
   rejectButton: {
-    backgroundColor: '#FEE2E2',
+    width: moderateScale(64),
+    height: moderateScale(64),
+    borderRadius: moderateScale(32),
+    backgroundColor: '#F2F2F7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: scale(16),
   },
-  rejectButtonText: {
-    color: '#DC2626',
-    fontSize: moderateScale(16),
+  sliderWrapper: {
+    flex: 1,
+  },
+  sliderContainer: {
+    height: moderateScale(64),
+    backgroundColor: '#E5F1FF',
+    borderRadius: moderateScale(32),
+    justifyContent: 'center',
+    padding: 4,
+  },
+  sliderTrack: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sliderText: {
+    fontSize: moderateScale(14),
     fontWeight: '700',
+    color: '#007AFF',
+    letterSpacing: 1,
+    marginLeft: moderateScale(20),
   },
-  acceptButton: {
-    backgroundColor: '#3B82F6',
-  },
-  acceptButtonText: {
-    color: '#FFFFFF',
-    fontSize: moderateScale(16),
-    fontWeight: '700',
+  sliderThumb: {
+    width: moderateScale(THUMB_SIZE),
+    height: moderateScale(THUMB_SIZE),
+    borderRadius: moderateScale(THUMB_SIZE / 2),
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });

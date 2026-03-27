@@ -29,11 +29,13 @@ interface AuthState {
   onboardingSubmitted: boolean;
   isAuthenticated: boolean;
   isHydrated: boolean;
+  hasSeenOnboarding: boolean;
 
   // Actions
   setAuth: (token: string, user: AuthUser, refreshToken?: string) => void;
   setProfile: (profile: DriverProfile) => void;
   setOnboardingSubmitted: (value: boolean) => void;
+  setHasSeenOnboarding: (value: boolean) => void;
   clearAuth: () => void;
   setHydrated: (value: boolean) => void;
 }
@@ -50,13 +52,10 @@ export const useAuthStore = create<AuthState>()(
       onboardingSubmitted: false,
       isAuthenticated: false,
       isHydrated: false,
+      hasSeenOnboarding: false,
 
       setAuth: (token, user, refreshToken) => {
         const safeUser = user ?? {id: '', phone: 'unknown', role: 'driver'};
-        console.log('[AuthStore] setAuth — phone:', safeUser.phone);
-        console.log('\n=============================================');
-        console.log('[AuthStore] 🔥 ACCESS_TOKEN 🔥 ->', token);
-        console.log('=============================================\n');
         set(state => ({
           token,
           refreshToken: refreshToken ?? null,
@@ -74,8 +73,11 @@ export const useAuthStore = create<AuthState>()(
         set({onboardingSubmitted: value});
       },
 
+      setHasSeenOnboarding: value => {
+        set({hasSeenOnboarding: value});
+      },
+
       clearAuth: () => {
-        console.log('[AuthStore] clearAuth — session cleared');
         set({
           token: null,
           refreshToken: null,
@@ -101,6 +103,7 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         onboardingSubmitted: state.onboardingSubmitted,
         isAuthenticated: state.isAuthenticated,
+        hasSeenOnboarding: state.hasSeenOnboarding,
       }),
     },
   ),
