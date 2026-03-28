@@ -135,10 +135,6 @@ const attachBookingListeners = () => {
       );
       return;
     }
-    console.log(
-      '[SocketService] Received booking offer:',
-      normalized.bookingId,
-    );
     bookingOfferCallback?.(normalized);
   };
 
@@ -294,10 +290,7 @@ export const connectSocket = (token: string) => {
       token: `Bearer ${token}`,
     };
     if (!socket.connected) {
-      console.log('[SocketService] Reconnecting existing socket...');
       socket.connect();
-    } else {
-      console.log('[SocketService] Socket already connected.');
     }
     attachBookingListeners();
     attachExpiredListener();
@@ -312,8 +305,6 @@ export const connectSocket = (token: string) => {
   const origin = API_BASE_URL.replace(/\/api\/?$/, '');
   const socketUrl = `${origin}/booking`;
 
-  console.log(`[SocketService] Connecting to ${socketUrl}...`);
-
   socket = io(socketUrl, {
     path: '/socket.io',
     auth: {
@@ -327,10 +318,6 @@ export const connectSocket = (token: string) => {
   });
 
   socket.on('connect', () => {
-    console.log(
-      '[SocketService] Successfully connected to server:',
-      socket?.id,
-    );
     attachBookingListeners();
     attachExpiredListener();
     attachNoDriversListener();
@@ -344,7 +331,6 @@ export const connectSocket = (token: string) => {
   });
 
   socket.on('disconnect', reason => {
-    console.log('[SocketService] Disconnected:', reason);
     if (reason === 'io server disconnect') {
       socket?.connect();
     }
@@ -353,7 +339,6 @@ export const connectSocket = (token: string) => {
 
 export const disconnectSocket = () => {
   if (socket) {
-    console.log('[SocketService] Disconnecting socket...');
     detachBookingListeners();
     detachExpiredListener();
     detachNoDriversListener();

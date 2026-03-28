@@ -74,7 +74,6 @@ export const submitOnboarding = async (
   // Verify we have an auth token before attempting upload
   const {useAuthStore} = require('../store/authStore');
   const token = useAuthStore.getState().token;
-  console.log('[Onboarding] Token present:', !!token);
 
   if (!token) {
     throw new Error('No auth token found. Please log in again.');
@@ -110,7 +109,6 @@ export const submitOnboarding = async (
   // Axios's default Content-Type: application/json conflicts with FormData
   // React Native's fetch handles FormData natively with correct boundary
   const url = `${API_BASE_URL}${ENDPOINTS.DRIVER_ONBOARD}`;
-  console.log('[Onboarding] Uploading to:', url);
 
   const res = await fetch(url, {
     method: 'POST',
@@ -122,7 +120,6 @@ export const submitOnboarding = async (
   });
 
   const json = await res.json();
-  console.log('[Onboarding] Response status:', res.status);
 
   if (!res.ok) {
     const msg = json?.message;

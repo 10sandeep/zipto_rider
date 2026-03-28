@@ -48,11 +48,7 @@ const hasOnboardingData = async () => {
     const hasVehicle = Array.isArray(vehicles) && vehicles.length > 0;
 
     return hasRequiredProfileData && hasVehicle;
-  } catch (error) {
-    console.log(
-      '[SplashScreen] Failed to determine onboarding completeness:',
-      error,
-    );
+  } catch {
     return false;
   }
 };
@@ -90,35 +86,18 @@ const SplashScreen = () => {
   const [isAnimComplete, setIsAnimComplete] = useState(false);
 
   useEffect(() => {
-    console.log(
-      '[SplashScreen] Auth State -> isHydrated:',
-      isHydrated,
-      '| isAuthenticated:',
-      isAuthenticated,
-    );
-
     if (!isHydrated) {
-      console.log('[SplashScreen] Still hydrating... waiting.');
       return;
     }
 
     const hasJwt = Boolean(token);
     if (!isAuthenticated && !hasJwt) {
       const dest = hasSeenOnboarding ? 'Welcome' : 'Onboarding';
-      console.log('[SplashScreen] Not authenticated, routing to', dest);
       setNextRoute(dest);
       return;
     }
 
-    console.log('\n=============================================');
-    console.log(
-      '[SplashScreen] 🔥 CACHED ACCESS_TOKEN 🔥 ->',
-      useAuthStore.getState().token,
-    );
-    console.log('=============================================\n');
-
     const checkStatus = async () => {
-      console.log('[SplashScreen] START checkStatus');
       const cachedProfile = useAuthStore.getState().profile ?? profile;
       const hasCachedOnboardingData = Boolean(
         cachedProfile?.name?.trim() &&
@@ -130,9 +109,6 @@ const SplashScreen = () => {
       let isResolved = false;
       const timeoutFallback = setTimeout(() => {
         if (!isResolved) {
-          console.log(
-            '[SplashScreen] API TIMEOUT - forcing fallback navigation',
-          );
           if (cachedProfile?.verification_status === 'APPROVED') {
             setNextRoute('MainTabs');
           } else if (
@@ -147,26 +123,15 @@ const SplashScreen = () => {
       }, 3000);
 
       try {
-        console.log('[SplashScreen] Calling getVerificationStatus()...');
         const status = await getVerificationStatus();
         isResolved = true;
         clearTimeout(timeoutFallback);
-        console.log('[SplashScreen] getVerificationStatus resolved:', status);
 
         if (status.verification_status === 'APPROVED') {
           // Pre-fetch profile if approved
-          console.log('[SplashScreen] Fetching driver profile...');
           getDriverProfile()
-            .then(p => {
-              console.log('[SplashScreen] Driver profile fetched successfully');
-              setProfile(p);
-            })
-            .catch(e =>
-              console.log(
-                '[SplashScreen] Failed to fetch profile behind scenes',
-                e,
-              ),
-            );
+            .then(p => setProfile(p))
+            .catch(() => {});
 
           setNextRoute('MainTabs');
         } else {
@@ -197,7 +162,6 @@ const SplashScreen = () => {
       } catch (error) {
         isResolved = true;
         clearTimeout(timeoutFallback);
-        console.log('[SplashScreen] getVerificationStatus ERROR:', error);
         const statusCode = getErrorStatusCode(error);
 
         // 404 means profile does not exist yet -> start onboarding flow.
@@ -238,9 +202,7 @@ const SplashScreen = () => {
   ]);
 
   useEffect(() => {
-    // If we've calculated the next route and the animation has also completed, execute navigation
     if (nextRoute && isAnimComplete) {
-      console.log('[SplashScreen] Navigating to', nextRoute);
       navigation.replace(nextRoute);
     }
   }, [nextRoute, isAnimComplete, navigation]);
@@ -319,7 +281,6 @@ const SplashScreen = () => {
         }),
       ]),
     ]).start(() => {
-      console.log('[SplashScreen] Animation complete');
       setIsAnimComplete(true);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

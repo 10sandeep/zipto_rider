@@ -507,6 +507,17 @@ export interface ActiveBooking {
   alternative_phone?: string;
 }
 
+export const getBookingById = async (bookingId: string): Promise<ActiveBooking | null> => {
+  try {
+    const response = await apiClient.get<{data: ActiveBooking; success: boolean}>(
+      ENDPOINTS.GET_BOOKING(bookingId),
+    );
+    return response.data.data ?? (response.data as unknown as ActiveBooking) ?? null;
+  } catch {
+    return null;
+  }
+};
+
 export const getDriverActiveBooking = async (): Promise<ActiveBooking | null> => {
   try {
     const response = await apiClient.get<{data: ActiveBooking; success: boolean}>(

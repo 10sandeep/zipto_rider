@@ -76,7 +76,6 @@ apiClient.interceptors.response.use(
           return Promise.reject(error);
         }
 
-        console.log('[API] Token expired, attempting refresh...');
         const refreshResponse = await axios.post(
           `${API_BASE_URL}${ENDPOINTS.REFRESH_TOKEN}`,
           {refresh_token: refreshToken},
@@ -93,7 +92,6 @@ apiClient.interceptors.response.use(
           refreshToken;
 
         if (newAccessToken) {
-          console.log('[API] Token refresh successful');
           setAuth(newAccessToken, user, newRefreshToken);
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;

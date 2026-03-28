@@ -81,15 +81,12 @@ export default function ProfileSetupScreen({navigation}: any) {
     setIsSubmitting(true);
 
     try {
-      console.log('[ProfileSetup] Submitting onboarding…');
       await submitOnboarding(payload);
-      console.log('[ProfileSetup] Onboarding success!');
       setOnboardingSubmitted(true);
 
       // Navigate to status screen
       navigation.navigate('KYCStatus');
     } catch (error) {
-      console.log('[ProfileSetup] Onboarding error:', error);
       const message = getOnboardingErrorMessage(error);
       Alert.alert('Submission Failed', message, [{text: 'Try Again'}]);
     } finally {

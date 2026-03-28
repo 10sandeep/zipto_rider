@@ -183,8 +183,7 @@ export default function HomeScreen({navigation}: any) {
       } else {
         Alert.alert('Could Not Accept', result);
       }
-    } catch (err) {
-      console.log('[HomeScreen] Accept booking error:', err);
+    } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setIsAccepting(false);
@@ -196,9 +195,7 @@ export default function HomeScreen({navigation}: any) {
     const bookingId = incomingBooking.bookingId;
     dismissOffer();
     // Fire-and-forget: tell backend to move to next driver immediately
-    rejectBooking(bookingId).then(err => {
-      if (err) console.log('[HomeScreen] Reject booking error:', err);
-    });
+    rejectBooking(bookingId);
   }, [incomingBooking, dismissOffer]);
 
   const initialRegion = {
@@ -229,9 +226,7 @@ export default function HomeScreen({navigation}: any) {
         v => v.verification_status?.toUpperCase() === 'APPROVED',
       );
       setHasApprovedVehicle(approved);
-    } catch (error) {
-      console.log('[HomeScreen] Failed to fetch profile:', error);
-    }
+    } catch {/* non-critical */}
   }, [setProfile]);
 
   const handleToggleOnline = async (value: boolean) => {
@@ -259,8 +254,7 @@ export default function HomeScreen({navigation}: any) {
         setIsOnline(!value);
         Alert.alert('Error', 'Failed to update availability status.');
       }
-    } catch (error) {
-      console.log('[HomeScreen] Failed to update availability:', error);
+    } catch {
       // Revert on failure
       setIsOnline(!value);
       Alert.alert('Error', 'Failed to update availability status.');
@@ -276,9 +270,7 @@ export default function HomeScreen({navigation}: any) {
         today_earnings: stats.today_earnings || 0,
         today_orders: stats.today_orders || 0,
       });
-    } catch (error) {
-      console.log('[HomeScreen] Failed to fetch daily stats:', error);
-    }
+    } catch {/* non-critical */}
   }, []);
 
   useEffect(() => {
@@ -352,7 +344,6 @@ export default function HomeScreen({navigation}: any) {
 
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) {
-        console.log('[HomeScreen] Location permission denied.');
         return;
       }
 
@@ -361,16 +352,9 @@ export default function HomeScreen({navigation}: any) {
           const {latitude, longitude} = position.coords;
           try {
             await updateLocation({latitude, longitude});
-            console.log(
-              `[HomeScreen] Location synced for ST_DWithin tracking: ${latitude}, ${longitude}`,
-            );
-          } catch (error) {
-            console.log('[HomeScreen] Failed to sync location:', error);
-          }
+          } catch {/* non-critical */}
         },
-        error => {
-          console.log('[HomeScreen] Geolocation error:', error);
-        },
+        _error => {/* geolocation error — silent */},
         {enableHighAccuracy: false, timeout: 20000, maximumAge: 10000},
       );
     };
@@ -419,9 +403,6 @@ export default function HomeScreen({navigation}: any) {
     // Reattach when coming from background back to active
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active' && isOnline) {
-        console.log(
-          '[HomeScreen] App came to foreground, restoring socket listener...',
-        );
         setupSocket();
       }
     });

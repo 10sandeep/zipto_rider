@@ -47,6 +47,7 @@ export const ENDPOINTS = {
   COMPLETE_TRIP: (bookingId: string) => `/booking/${bookingId}/complete`,// PUT - complete trip (toll, waiting)
   AVAILABLE_BOOKINGS: '/booking/available',                              // GET - broadcast bookings near driver
   DRIVER_ACTIVE_BOOKING: '/booking/driver/active',                       // GET - driver's current active booking
+  GET_BOOKING: (bookingId: string) => `/booking/${bookingId}`,           // GET - get booking by ID
 
   // Calendar / Attendance
   DRIVER_CALENDAR: '/driver/calendar',        // GET  - driver calendar with earnings per day

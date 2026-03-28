@@ -77,9 +77,7 @@ export default function OrderHistoryScreen({navigation}: any) {
         setHasMore(tripsResponse.hasNext);
         setPage(tripsResponse.page);
         setActiveBooking(active);
-      } catch (error) {
-        console.log('Error fetching order history:', error);
-      } finally {
+      } catch {/* non-critical */} finally {
         setLoading(false);
         setRefreshing(false);
       }

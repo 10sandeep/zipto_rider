@@ -65,7 +65,6 @@ export default function OTPVerificationScreen({navigation, route}: any) {
       } = require('../services/driverService');
 
       const statusData = await getVerificationStatus();
-      console.log('[OTP] Verification status:', statusData);
 
       if (statusData.verification_status === 'APPROVED') {
         navigation.replace('MainTabs');
@@ -90,21 +89,15 @@ export default function OTPVerificationScreen({navigation, route}: any) {
             profile?.email?.trim() &&
             profile?.address?.trim(),
         );
-      } catch (profileError) {
-        console.log(
-          '[OTP] Profile fetch failed while resolving route:',
-          profileError,
-        );
+      } catch {
+        // profile fetch failed — continue with defaults
       }
 
       try {
         const vehicles = await getMyVehicles();
         hasVehicle = Array.isArray(vehicles) && vehicles.length > 0;
-      } catch (vehicleError) {
-        console.log(
-          '[OTP] Vehicle fetch failed while resolving route:',
-          vehicleError,
-        );
+      } catch {
+        // vehicle fetch failed — continue with defaults
       }
 
       navigation.replace(
@@ -181,13 +174,6 @@ export default function OTPVerificationScreen({navigation, route}: any) {
     setIsVerifying(true);
     try {
       const response = await verifyOTP(phoneNumber, otpCode, 'driver');
-      console.log('[OTP] verifyOTP response keys:', Object.keys(response));
-      console.log(
-        '[OTP] access_token exists:',
-        !!response.access_token,
-        '\nToken:',
-        response.access_token,
-      );
 
       // Build a safe user — API returns user with snake_case fields
       const safeUser = response.user ?? {
@@ -201,8 +187,7 @@ export default function OTPVerificationScreen({navigation, route}: any) {
 
       try {
         await resolvePostOtpRoute(flow);
-      } catch (err: any) {
-        console.log('[OTP] Post-OTP route resolution failed:', err.message);
+      } catch {
         // Safe fallback: start onboarding when route resolution fails.
         navigation.replace('KYCVehicleRegistration');
       }

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -11,17 +11,11 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 
 export default function WelcomeScreen({ navigation }: any) {
-  useEffect(() => {
-    console.log('WelcomeScreen mounted');
-  }, []);
-
   const handleRegister = () => {
-    console.log('Register button pressed - navigating to Register screen');
     navigation.navigate('Register');
   };
 
   const handleLogin = () => {
-    console.log('Login button pressed - navigating to Login screen');
     navigation.navigate('Login');
   };
 
