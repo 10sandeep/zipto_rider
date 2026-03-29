@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- Push notification permission (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
 
     <application
@@ -30,5 +32,18 @@
       <meta-data
         android:name="com.google.android.geo.API_KEY"
         android:value="AIzaSyBk3embTThBzPAZBmSlIYue_JFHk2iBe9A"/>
+
+      <!-- Firebase: default notification channel for FCM -->
+      <meta-data
+        android:name="com.google.firebase.messaging.default_notification_channel_id"
+        android:value="zipto_default"/>
+      <!-- Firebase: default notification icon -->
+      <meta-data
+        android:name="com.google.firebase.messaging.default_notification_icon"
+        android:resource="@mipmap/ic_launcher"/>
+      <!-- Firebase: default notification color -->
+      <meta-data
+        android:name="com.google.firebase.messaging.default_notification_color"
+        android:resource="@color/notification_color"/>
     </application>
 </manifest>
