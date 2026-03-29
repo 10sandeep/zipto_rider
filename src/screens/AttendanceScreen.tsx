@@ -137,6 +137,7 @@ const styles = StyleSheet.create({
   headerTitle: { 
     fontSize: moderateScale(18), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E' 
   },
   periodSelector: { 
@@ -162,6 +163,7 @@ const styles = StyleSheet.create({
   periodText: { 
     fontSize: moderateScale(14), 
     fontWeight: '600', 
+    fontFamily: 'Poppins-Regular',
     color: '#666' 
   },
   periodTextActive: { 
@@ -196,11 +198,13 @@ const styles = StyleSheet.create({
   summaryValue: { 
     fontSize: moderateScale(isSmallDevice ? 32 : 36), 
     fontWeight: '800', 
+    fontFamily: 'Poppins-Regular',
     color: '#FFFFFF', 
     marginBottom: verticalScale(8) 
   },
   summaryLabel: { 
     fontSize: moderateScale(14), 
+    fontFamily: 'Poppins-Regular',
     color: 'rgba(255,255,255,0.9)' 
   },
   attendanceList: { 
@@ -209,6 +213,7 @@ const styles = StyleSheet.create({
   sectionTitle: { 
     fontSize: moderateScale(18), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E', 
     marginBottom: verticalScale(12) 
   },
@@ -234,6 +239,7 @@ const styles = StyleSheet.create({
   dateText: { 
     fontSize: moderateScale(16), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E', 
     marginBottom: verticalScale(4) 
   },
@@ -269,12 +275,14 @@ const styles = StyleSheet.create({
   },
   hoursText: { 
     fontSize: moderateScale(15), 
-    fontWeight: '700', 
+    fontWeight: '700',
+    fontFamily: 'Poppins-Regular', 
     color: '#1C1C1E', 
     marginBottom: verticalScale(4) 
   },
   earningsText: { 
     fontSize: moderateScale(13), 
+    fontFamily: 'Poppins-Regular',
     color: '#8E8E93' 
   },
   legendCard: { 
@@ -288,7 +296,7 @@ const styles = StyleSheet.create({
     elevation: 2
   },
   legendTitle: { 
-    fontFamily:"poppins-regular",
+    fontFamily:"Poppins-Regular",
     fontSize: moderateScale(16), 
     fontWeight: '700', 
     color: '#1C1C1E', 
@@ -307,6 +315,7 @@ const styles = StyleSheet.create({
   },
   legendText: { 
     fontSize: moderateScale(14), 
-    color: '#666' 
+    color: '#666' ,
+    fontFamily: 'Poppins-Regular',
   },
 });

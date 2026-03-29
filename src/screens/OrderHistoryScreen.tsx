@@ -245,6 +245,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: moderateScale(isSmallDevice ? 20 : 24),
     fontWeight: '800',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
   },
   filterContainer: {
@@ -276,6 +277,7 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: moderateScale(14),
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
     color: '#666',
   },
   filterTextActive: {
@@ -306,6 +308,7 @@ const styles = StyleSheet.create({
   orderId: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     flex: 1,
     marginRight: scale(8),
@@ -323,6 +326,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: moderateScale(12),
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
     color: '#50C878',
   },
   statusTextCancelled: {
@@ -336,6 +340,7 @@ const styles = StyleSheet.create({
   routeText: {
     flex: 1,
     fontSize: moderateScale(13),
+    fontFamily: 'Poppins-Regular',
     color: '#666',
   },
   routeArrow: {
@@ -360,6 +365,7 @@ const styles = StyleSheet.create({
   orderAmount: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#3B82F6',
     flexShrink: 0,
   },
@@ -373,5 +379,6 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: verticalScale(12),
     fontWeight: '500',
+    fontFamily: 'Poppins-Regular',
   },
 });

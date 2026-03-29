@@ -375,12 +375,14 @@ const styles = StyleSheet.create({
   },
   headerTitle: { 
     fontSize: moderateScale(18), 
-    fontWeight: '700', 
+    fontWeight: '700',
+    fontFamily: 'Poppins-Regular', 
     color: '#1C1C1E' 
   },
   editText: { 
     fontSize: moderateScale(14), 
     fontWeight: '600', 
+    fontFamily: 'Poppins-Regular',
     color: '#3B82F6' 
   },
   scrollContent: { 
@@ -395,6 +397,7 @@ const styles = StyleSheet.create({
   formTitle: { 
     fontSize: moderateScale(isSmallDevice ? 22 : 24), 
     fontWeight: '800', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E', 
     marginBottom: verticalScale(24) 
   },
@@ -404,6 +407,7 @@ const styles = StyleSheet.create({
   inputLabel: { 
     fontSize: moderateScale(14), 
     fontWeight: '600', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E', 
     marginBottom: verticalScale(8) 
   },
@@ -414,6 +418,7 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(12),
     padding: scale(16),
     fontSize: moderateScale(16),
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     minHeight: verticalScale(50),
   },
@@ -438,7 +443,8 @@ const styles = StyleSheet.create({
   },
   accountTypeText: { 
     fontSize: moderateScale(16), 
-    fontWeight: '600', 
+    fontWeight: '600',
+    fontFamily: 'Poppins-Regular', 
     color: '#666' 
   },
   accountTypeTextActive: { 
@@ -460,7 +466,8 @@ const styles = StyleSheet.create({
   },
   saveButtonText: { 
     fontSize: moderateScale(16), 
-    fontWeight: '700', 
+    fontWeight: '700',
+    fontFamily: 'Poppins-Regular', 
     color: '#FFFFFF' 
   },
   cancelButton: {
@@ -474,7 +481,8 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: { 
     fontSize: moderateScale(16), 
-    fontWeight: '600', 
+    fontWeight: '600',
+    fontFamily: 'Poppins-Regular', 
     color: '#666' 
   },
   
@@ -485,6 +493,7 @@ const styles = StyleSheet.create({
   selectorLabel: { 
     fontSize: moderateScale(14), 
     fontWeight: '600', 
+    fontFamily: 'Poppins-Regular',
     color: '#666', 
     marginBottom: verticalScale(12) 
   },
@@ -504,6 +513,7 @@ const styles = StyleSheet.create({
   accountChipText: { 
     fontSize: moderateScale(14), 
     fontWeight: '600', 
+    fontFamily: 'Poppins-Regular',
     color: '#666' 
   },
   accountChipTextActive: { 
@@ -528,6 +538,7 @@ const styles = StyleSheet.create({
   bankName: { 
     fontSize: moderateScale(20), 
     fontWeight: '800', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E', 
     marginBottom: verticalScale(12),
     textAlign: 'center',
@@ -540,7 +551,8 @@ const styles = StyleSheet.create({
   },
   verifiedText: { 
     fontSize: moderateScale(13), 
-    fontWeight: '600', 
+    fontWeight: '600',
+    fontFamily: 'Poppins-Regular', 
     color: '#50C878' 
   },
   detailsSection: { 
@@ -548,7 +560,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { 
     fontSize: moderateScale(16), 
-    fontWeight: '700', 
+    fontWeight: '700',
+    fontFamily: 'Poppins-Regular', 
     color: '#1C1C1E', 
     marginBottom: verticalScale(12) 
   },
@@ -578,6 +591,7 @@ const styles = StyleSheet.create({
   detailValue: { 
     fontSize: moderateScale(14), 
     fontWeight: '600', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     flex: 1,
     textAlign: 'right',
@@ -597,7 +611,8 @@ const styles = StyleSheet.create({
   },
   addAnotherText: { 
     fontSize: moderateScale(14), 
-    fontWeight: '600', 
+    fontWeight: '600',
+    fontFamily: 'Poppins-Regular', 
     color: '#3B82F6', 
     marginLeft: scale(8) 
   },
@@ -618,12 +633,14 @@ const styles = StyleSheet.create({
   infoTitle: { 
     fontSize: moderateScale(14), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E', 
     marginBottom: verticalScale(4) 
   },
   infoText: { 
     fontSize: moderateScale(13), 
     color: '#666', 
+    fontFamily: 'Poppins-Regular',
     lineHeight: moderateScale(18) 
   },
   transactionsSection: { 
@@ -649,11 +666,13 @@ const styles = StyleSheet.create({
   transactionAmount: { 
     fontSize: moderateScale(18), 
     fontWeight: '800', 
+    fontFamily: 'Poppins-Regular',
     color: '#50C878', 
     marginBottom: verticalScale(4) 
   },
   transactionDate: { 
-    fontSize: moderateScale(13), 
+    fontSize: moderateScale(13),
+    fontFamily: 'Poppins-Regular', 
     color: '#8E8E93' 
   },
   statusBadge: { 
@@ -666,6 +685,7 @@ const styles = StyleSheet.create({
   statusText: { 
     fontSize: moderateScale(12), 
     fontWeight: '600', 
+    fontFamily: 'Poppins-Regular',
     color: '#50C878' 
   },
 });

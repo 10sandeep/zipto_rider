@@ -205,6 +205,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: moderateScale(18),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
   },
   scrollContent: {
@@ -230,6 +231,7 @@ const styles = StyleSheet.create({
   vehicleType: {
     fontSize: moderateScale(22),
     fontWeight: '800',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(12),
   },
@@ -242,6 +244,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: moderateScale(13),
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
     color: '#50C878',
   },
   detailsSection: {
@@ -250,6 +253,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(12),
   },
@@ -280,6 +284,7 @@ const styles = StyleSheet.create({
   detailValue: {
     fontSize: moderateScale(14),
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     textAlign: 'right',
   },
@@ -309,6 +314,7 @@ const styles = StyleSheet.create({
   documentName: {
     fontSize: moderateScale(15),
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(4),
   },
@@ -326,6 +332,7 @@ const styles = StyleSheet.create({
   verifiedText: {
     fontSize: moderateScale(12),
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
     color: '#50C878',
   },
   addVehicleButton: {
@@ -347,6 +354,7 @@ const styles = StyleSheet.create({
   addVehicleText: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#3B82F6',
   },
 });

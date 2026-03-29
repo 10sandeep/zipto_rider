@@ -140,11 +140,13 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   mapText: {
-    fontSize: moderateScale(isSmallDevice ? 40 : 48)
+    fontSize: moderateScale(isSmallDevice ? 40 : 48),
+    fontFamily: 'Poppins-Regular',
   },
   mapSubtext: {
     fontSize: moderateScale(14), 
     color: '#666', 
+    fontFamily: 'Poppins-Regular',
     marginTop: verticalScale(8)
   },
   bottomSheet: {
@@ -174,6 +176,7 @@ const styles = StyleSheet.create({
   stepLabel: {
     fontSize: moderateScale(18),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(16),
   },
@@ -194,6 +197,7 @@ const styles = StyleSheet.create({
   etaValue: {
     fontSize: moderateScale(isSmallDevice ? 20 : 24),
     fontWeight: '800',
+    fontFamily: 'Poppins-Regular',
     color: '#007AFF',
     marginBottom: verticalScale(4),
   },
@@ -239,7 +243,8 @@ const styles = StyleSheet.create({
   completeButtonText: {
     color: '#FFFFFF', 
     fontSize: moderateScale(16), 
-    fontWeight: '700'
+    fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
   },
   navigationButtons: {
     flexDirection: 'row', 

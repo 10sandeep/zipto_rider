@@ -134,9 +134,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   headerTitle: { 
-    fontFamily:"poppin-regular",
     fontSize: moderateScale(18), 
-    fontWeight: '700', 
+    fontWeight: '700',
+    fontFamily: 'Poppins-Regular', 
     color: '#1C1C1E' 
   },
   scrollContent: { 
@@ -161,13 +161,15 @@ const styles = StyleSheet.create({
   },
   heroTitle: { 
     fontSize: moderateScale(isSmallDevice ? 20 : 24), 
-    fontWeight: '800', 
+    fontWeight: '800',
+    fontFamily: 'Poppins-Regular', 
     color: '#FFFFFF', 
     marginBottom: verticalScale(8),
     textAlign: 'center',
   },
   heroSubtitle: { 
     fontSize: moderateScale(15), 
+    fontFamily: 'Poppins-Regular',
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
   },
@@ -176,7 +178,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { 
     fontSize: moderateScale(18), 
-    fontWeight: '700', 
+    fontWeight: '700',
+    fontFamily: 'Poppins-Regular', 
     color: '#1C1C1E', 
     marginBottom: verticalScale(12) 
   },
@@ -234,11 +237,13 @@ const styles = StyleSheet.create({
   faqQuestion: { 
     fontSize: moderateScale(15), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E', 
     marginBottom: verticalScale(8) 
   },
   faqAnswer: { 
-    fontSize: moderateScale(14), 
+    fontSize: moderateScale(14),
+    fontFamily: 'Poppins-Regular', 
     color: '#666', 
     lineHeight: moderateScale(20) 
   },

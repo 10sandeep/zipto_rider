@@ -146,7 +146,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: moderateScale(18), 
-    fontWeight: '700', 
+    fontWeight: '700',
+    fontFamily: 'Poppins-Regular', 
     color: '#1C1C1E'
   },
   content: {
@@ -173,6 +174,7 @@ const styles = StyleSheet.create({
   orderIdValue: {
     fontSize: moderateScale(20),
     fontWeight: '800',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(12),
   },
@@ -184,7 +186,8 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: moderateScale(13), 
-    fontWeight: '600', 
+    fontWeight: '600',
+    fontFamily: 'Poppins-Regular', 
     color: '#F59E0B'
   },
   section: {
@@ -193,6 +196,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(12),
   },
@@ -217,11 +221,13 @@ const styles = StyleSheet.create({
   locationName: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(4),
   },
   locationAddress: {
-    fontSize: moderateScale(14), 
+    fontSize: moderateScale(14),
+    fontFamily: 'Poppins-Regular', 
     color: '#666', 
     marginBottom: verticalScale(4),
     lineHeight: moderateScale(20),
@@ -229,7 +235,8 @@ const styles = StyleSheet.create({
   locationContact: {
     fontSize: moderateScale(13), 
     color: '#3B82F6', 
-    fontWeight: '600'
+    fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
   },
   detailsCard: {
     backgroundColor: '#FFFFFF', 
@@ -253,11 +260,13 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: moderateScale(14), 
     color: '#666',
+    fontFamily: 'Poppins-Regular',
     flex: 1,
   },
   detailValue: {
     fontSize: moderateScale(14), 
     fontWeight: '600', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     textAlign: 'right',
   },
@@ -296,6 +305,7 @@ const styles = StyleSheet.create({
   callButtonText: {
     fontSize: moderateScale(16), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E'
   },
   navigateButton: {
@@ -315,6 +325,7 @@ const styles = StyleSheet.create({
   navigateButtonText: {
     fontSize: moderateScale(16), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#FFFFFF'
   },
 });

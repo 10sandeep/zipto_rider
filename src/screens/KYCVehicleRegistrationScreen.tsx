@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Dimensions,
   Platform,
   KeyboardAvoidingView,
+  Animated,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useOnboardingStore, ApiVehicleType} from '../store/onboardingStore';
@@ -24,6 +25,7 @@ const moderateScale = (size: number, factor = 0.5) =>
   size + (scale(size) - size) * factor;
 
 const isSmallDevice = SCREEN_WIDTH < 375;
+const isLargeDevice = SCREEN_WIDTH >= 414;
 
 // ─── Vehicle options (UI → API mapping) ──────────────────────
 const VEHICLE_TYPE_MAP: Record<string, ApiVehicleType> = {
@@ -37,32 +39,51 @@ const vehicles = [
   {
     id: 'bike',
     name: 'Bike',
-    image: require('../assets/vehicle2.png'),
-    capacity: 'Up to 20kg',
+    image: require('../assets/bike_img.png'),
+    capacity: 'Up to 8kg',
     defaultCapacity: '20',
+    icon: '🏍️',
+    tag: 'Express',
+  },
+  {
+    id: 'scooter',
+    name: 'Scooter',
+    image: require('../assets/scooter_img.png'),
+    capacity: 'Up to 10kg',
+    defaultCapacity: '10',
+    icon: '🛵',
+    tag: 'City',
   },
   {
     id: 'auto',
     name: 'Auto',
-    image: require('../assets/vehicle1.png'),
+    image: require('../assets/auto_img.png'),
     capacity: 'Up to 50kg',
     defaultCapacity: '50',
+    icon: '🛺',
+    tag: 'Standard',
   },
   {
     id: 'pickup',
     name: 'Pick Up',
-    image: require('../assets/vehicle3.png'),
+    image: require('../assets/pickup_img.png'),
     capacity: 'Up to 500kg',
     defaultCapacity: '500',
+    icon: '🚐',
+    tag: 'Large',
   },
   {
     id: 'truck',
     name: 'Truck',
-    image: require('../assets/vehicle4.png'),
+    image: require('../assets/truck_img.png'),
     capacity: 'Up to 5000kg',
     defaultCapacity: '5000',
+    icon: '🚛',
+    tag: 'Heavy',
   },
 ];
+
+const CARD_WIDTH = (SCREEN_WIDTH - scale(52)) / 2;
 
 export default function VehicleSelectionScreen({navigation}: any) {
   const setVehicle = useOnboardingStore(s => s.setVehicle);
@@ -71,9 +92,28 @@ export default function VehicleSelectionScreen({navigation}: any) {
   const [vehicleModel, setVehicleModel] = useState('');
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [vehicleCapacity, setVehicleCapacity] = useState('');
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  // Pre-fill capacity when a vehicle card is tapped
+  const scaleAnim = useRef<Record<string, Animated.Value>>({}).current;
+  vehicles.forEach(v => {
+    if (!scaleAnim[v.id]) scaleAnim[v.id] = new Animated.Value(1);
+  });
+
   const onSelectVehicle = (id: string) => {
+    // Animate card press
+    Animated.sequence([
+      Animated.timing(scaleAnim[id], {
+        toValue: 0.93,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim[id], {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     setSelectedVehicle(id);
     const vehicle = vehicles.find(v => v.id === id);
     if (vehicle) {
@@ -89,22 +129,19 @@ export default function VehicleSelectionScreen({navigation}: any) {
 
   const handleContinue = () => {
     if (!selectedVehicle || !isFormValid) return;
-
     const apiType = VEHICLE_TYPE_MAP[selectedVehicle] ?? 'bike';
-
     setVehicle({
       vehicleType: apiType,
       vehicleModel: vehicleModel.trim(),
       vehicleCapacity: vehicleCapacity.trim(),
       vehicleRegistrationNumber: registrationNumber.trim(),
     });
-
     navigation.navigate('DocumentUpload');
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F8F9FF" />
 
       {/* Header */}
       <View style={styles.header}>
@@ -115,12 +152,19 @@ export default function VehicleSelectionScreen({navigation}: any) {
           hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
           <Ionicons
             name="arrow-back"
-            size={moderateScale(24)}
-            color="#3B82F6"
+            size={moderateScale(20)}
+            color="#2563EB"
           />
         </TouchableOpacity>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, {width: '25%'}]} />
+
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>Step 1 of 4</Text>
+            <Text style={styles.progressPercent}>25%</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={styles.progressFill} />
+          </View>
         </View>
       </View>
 
@@ -131,111 +175,209 @@ export default function VehicleSelectionScreen({navigation}: any) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
-          {/* Title */}
-          <Text style={styles.title}>Select Your Vehicle</Text>
-          <Text style={styles.subtitle}>
-            Choose the vehicle you'll use for deliveries
-          </Text>
 
-          {/* Vehicle Cards */}
+          {/* Title Block */}
+          <View style={styles.titleBlock}>
+            <View style={styles.titleBadge}>
+              <Text style={styles.titleBadgeText}>Vehicle Setup</Text>
+            </View>
+            <Text style={styles.title}>Select Your{'\n'}Vehicle Type</Text>
+            <Text style={styles.subtitle}>
+              Choose the vehicle you'll use for deliveries
+            </Text>
+          </View>
+
+          {/* Vehicle Cards Grid */}
           <View style={styles.vehicleGrid}>
             {vehicles.map(vehicle => (
-              <TouchableOpacity
+              <Animated.View
                 key={vehicle.id}
-                style={[
-                  styles.vehicleCard,
-                  selectedVehicle === vehicle.id && styles.selectedCard,
-                ]}
-                onPress={() => onSelectVehicle(vehicle.id)}
-                activeOpacity={0.7}>
-                <View style={styles.vehicleImageContainer}>
-                  <Image
-                    source={vehicle.image}
-                    style={styles.vehicleImage as ImageStyle}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.vehicleName}>{vehicle.name}</Text>
-                <Text style={styles.capacityText}>{vehicle.capacity}</Text>
+                style={{transform: [{scale: scaleAnim[vehicle.id]}]}}>
+                <TouchableOpacity
+                  style={[
+                    styles.vehicleCard,
+                    selectedVehicle === vehicle.id && styles.selectedCard,
+                  ]}
+                  onPress={() => onSelectVehicle(vehicle.id)}
+                  activeOpacity={0.9}>
 
-                {selectedVehicle === vehicle.id && (
-                  <View style={styles.checkmark}>
-                    <Ionicons
-                      name="checkmark"
-                      size={moderateScale(18)}
-                      color="#FFFFFF"
+                  {/* Tag */}
+                  <View
+                    style={[
+                      styles.vehicleTag,
+                      selectedVehicle === vehicle.id && styles.vehicleTagSelected,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.vehicleTagText,
+                        selectedVehicle === vehicle.id &&
+                          styles.vehicleTagTextSelected,
+                      ]}>
+                      {vehicle.tag}
+                    </Text>
+                  </View>
+
+                  {/* Image */}
+                  <View style={styles.vehicleImageContainer}>
+                    <Image
+                      source={vehicle.image}
+                      style={styles.vehicleImage as ImageStyle}
+                      resizeMode="contain"
                     />
                   </View>
-                )}
-              </TouchableOpacity>
+
+                  <Text
+                    style={[
+                      styles.vehicleName,
+                      selectedVehicle === vehicle.id && styles.vehicleNameSelected,
+                    ]}>
+                    {vehicle.name}
+                  </Text>
+                  <Text style={styles.capacityText}>{vehicle.capacity}</Text>
+
+                  {/* Checkmark */}
+                  {selectedVehicle === vehicle.id && (
+                    <View style={styles.checkmark}>
+                      <Ionicons
+                        name="checkmark"
+                        size={moderateScale(13)}
+                        color="#FFFFFF"
+                      />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
             ))}
           </View>
 
           {/* Vehicle Details — shown after selection */}
           {selectedVehicle && (
             <View style={styles.detailsSection}>
-              <Text style={styles.sectionTitle}>Vehicle Details</Text>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Vehicle Model *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Honda Activa, Tata Ace"
-                  placeholderTextColor="#999"
-                  value={vehicleModel}
-                  onChangeText={setVehicleModel}
-                />
+              <View style={styles.detailsHeader}>
+                <View style={styles.detailsDot} />
+                <Text style={styles.sectionTitle}>Vehicle Details</Text>
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Registration Number *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. OD-02-A-1234"
-                  placeholderTextColor="#999"
-                  value={registrationNumber}
-                  onChangeText={setRegistrationNumber}
-                  autoCapitalize="characters"
-                />
+                <Text style={styles.label}>Vehicle Model</Text>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    focusedField === 'model' && styles.inputWrapperFocused,
+                  ]}>
+                  <Ionicons
+                    name="car-outline"
+                    size={moderateScale(18)}
+                    color={focusedField === 'model' ? '#2563EB' : '#9CA3AF'}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. Honda Activa, Tata Ace"
+                    placeholderTextColor="#C4C9D4"
+                    value={vehicleModel}
+                    onChangeText={setVehicleModel}
+                    onFocus={() => setFocusedField('model')}
+                    onBlur={() => setFocusedField(null)}
+                  />
+                </View>
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Vehicle Capacity (kg) *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 100"
-                  placeholderTextColor="#999"
-                  value={vehicleCapacity}
-                  onChangeText={setVehicleCapacity}
-                  keyboardType="numeric"
-                />
+                <Text style={styles.label}>Registration Number</Text>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    focusedField === 'reg' && styles.inputWrapperFocused,
+                  ]}>
+                  <Ionicons
+                    name="document-text-outline"
+                    size={moderateScale(18)}
+                    color={focusedField === 'reg' ? '#2563EB' : '#9CA3AF'}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. OD-02-A-1234"
+                    placeholderTextColor="#C4C9D4"
+                    value={registrationNumber}
+                    onChangeText={setRegistrationNumber}
+                    autoCapitalize="characters"
+                    onFocus={() => setFocusedField('reg')}
+                    onBlur={() => setFocusedField(null)}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Vehicle Capacity</Text>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    focusedField === 'cap' && styles.inputWrapperFocused,
+                  ]}>
+                  <Ionicons
+                    name="barbell-outline"
+                    size={moderateScale(18)}
+                    color={focusedField === 'cap' ? '#2563EB' : '#9CA3AF'}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 100"
+                    placeholderTextColor="#C4C9D4"
+                    value={vehicleCapacity}
+                    onChangeText={setVehicleCapacity}
+                    keyboardType="numeric"
+                    onFocus={() => setFocusedField('cap')}
+                    onBlur={() => setFocusedField(null)}
+                  />
+                  <View style={styles.inputSuffix}>
+                    <Text style={styles.inputSuffixText}>kg</Text>
+                  </View>
+                </View>
               </View>
             </View>
           )}
 
           {/* Info Box */}
           <View style={styles.infoBox}>
-            <Ionicons
-              name="information-circle"
-              size={moderateScale(22)}
-              color="#3B82F6"
-              style={styles.infoIcon}
-            />
+            <View style={styles.infoIconWrap}>
+              <Ionicons
+                name="layers-outline"
+                size={moderateScale(18)}
+                color="#2563EB"
+              />
+            </View>
             <Text style={styles.infoText}>
-              You can add multiple vehicles later from your profile
+              You can add multiple vehicles later from your profile settings
             </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Continue Button */}
+      {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.continueButton, !isFormValid && styles.buttonDisabled]}
+          style={[
+            styles.continueButton,
+            !isFormValid && styles.buttonDisabled,
+          ]}
           onPress={handleContinue}
           disabled={!isFormValid}
-          activeOpacity={0.8}>
+          activeOpacity={0.85}>
           <Text style={styles.buttonText}>Continue</Text>
+          <View
+            style={[
+              styles.buttonArrow,
+              !isFormValid && styles.buttonArrowDisabled,
+            ]}>
+            <Ionicons
+              name="arrow-forward"
+              size={moderateScale(18)}
+              color={isFormValid ? '#2563EB' : '#BFDBFE'}
+            />
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -245,202 +387,381 @@ export default function VehicleSelectionScreen({navigation}: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8F9FF',
   },
+
+  // ─── Header ──────────────────────────────────────────────────
   header: {
     paddingHorizontal: scale(20),
-    paddingTop: Platform.OS === 'ios' ? verticalScale(50) : verticalScale(40),
-    paddingBottom: verticalScale(20),
+    paddingTop: Platform.OS === 'ios' ? verticalScale(54) : verticalScale(40),
+    paddingBottom: verticalScale(16),
+    backgroundColor: '#F8F9FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(14),
   },
   backButton: {
-    width: moderateScale(44),
-    height: moderateScale(44),
-    borderRadius: moderateScale(22),
-    backgroundColor: '#EFF6FF',
+    width: moderateScale(42),
+    height: moderateScale(42),
+    borderRadius: moderateScale(13),
+    backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: verticalScale(16),
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
-  progressBar: {
-    height: verticalScale(4),
-    backgroundColor: '#F5F5F5',
-    borderRadius: moderateScale(2),
+  progressSection: {
+    flex: 1,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: verticalScale(6),
+  },
+  progressLabel: {
+    fontSize: moderateScale(12),
+    color: '#6B7280',
+    fontWeight: '500',
+    fontFamily:'Poppins-Regular',
+    letterSpacing: 0.3,
+  },
+  progressPercent: {
+    fontSize: moderateScale(12),
+    fontFamily:'Poppins-Regular',
+    color: '#2563EB',
+    fontWeight: '700',
+  },
+  progressTrack: {
+    height: verticalScale(5),
+    backgroundColor: '#E0E7FF',
+    borderRadius: moderateScale(10),
+    overflow: 'hidden',
   },
   progressFill: {
+    width: '25%',
     height: '100%',
-    backgroundColor: '#3B82F6',
-    borderRadius: moderateScale(2),
+    backgroundColor: '#2563EB',
+    borderRadius: moderateScale(10),
   },
+
+  // ─── Scroll Content ───────────────────────────────────────────
   scrollContent: {
     paddingHorizontal: scale(20),
     paddingBottom: verticalScale(120),
   },
+
+  // ─── Title Block ──────────────────────────────────────────────
+  titleBlock: {
+    marginTop: verticalScale(12),
+    marginBottom: verticalScale(28),
+  },
+  titleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#EEF2FF',
+    borderRadius: moderateScale(8),
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(4),
+    marginBottom: verticalScale(12),
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  titleBadgeText: {
+    fontSize: moderateScale(11),
+    color: '#4F46E5',
+    fontWeight: '700',
+    fontFamily:'Poppins-Regular',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
   title: {
-    fontSize: moderateScale(isSmallDevice ? 24 : 28),
+    fontSize: moderateScale(isSmallDevice ? 26 : isLargeDevice ? 32 : 28),
     fontWeight: '800',
-    color: '#1C1C1E',
+    fontFamily:'Poppins-Regular',
+    color: '#111827',
     marginBottom: verticalScale(8),
-    marginTop: verticalScale(20),
+    lineHeight: moderateScale(isSmallDevice ? 33 : isLargeDevice ? 40 : 36),
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: moderateScale(16),
-    color: '#8E8E93',
-    marginBottom: verticalScale(30),
-    lineHeight: moderateScale(22),
+    fontSize: moderateScale(14),
+    color: '#6B7280',
+    fontFamily:'Poppins-Regular',
+    lineHeight: moderateScale(20),
+    fontWeight: '400',
   },
+
+  // ─── Vehicle Grid ─────────────────────────────────────────────
   vehicleGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: verticalScale(20),
+    marginBottom: verticalScale(24),
+    gap: verticalScale(0),
   },
   vehicleCard: {
-    width: (SCREEN_WIDTH - scale(52)) / 2,
-    backgroundColor: '#F5F5F5',
-    padding: scale(20),
-    borderRadius: moderateScale(16),
+    width: CARD_WIDTH,
+    backgroundColor: '#FFFFFF',
+    padding: scale(14),
+    borderRadius: moderateScale(18),
     alignItems: 'center',
-    marginBottom: verticalScale(16),
-    borderWidth: 2,
-    borderColor: 'transparent',
-    minHeight: verticalScale(180),
+    marginBottom: verticalScale(14),
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    minHeight: verticalScale(160),
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 2,
+    position: 'relative',
+    overflow: 'hidden',
   },
   selectedCard: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
-    shadowColor: '#3B82F6',
-    shadowOpacity: 0.2,
-    elevation: 4,
+    backgroundColor: '#EEF2FF',
+    borderColor: '#2563EB',
+    shadowColor: '#2563EB',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  vehicleTag: {
+    position: 'absolute',
+    top: scale(10),
+    left: scale(10),
+    backgroundColor: '#F3F4F6',
+    borderRadius: moderateScale(6),
+    paddingHorizontal: scale(7),
+    paddingVertical: verticalScale(2),
+  },
+  vehicleTagSelected: {
+    backgroundColor: '#DBEAFE',
+  },
+  vehicleTagText: {
+    fontSize: moderateScale(9),
+    color: '#9CA3AF',
+    fontWeight: '700',
+    fontFamily:'Poppins-Regular',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  vehicleTagTextSelected: {
+    color: '#2563EB',
   },
   vehicleImageContainer: {
-    height: verticalScale(80),
+    height: verticalScale(72),
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: verticalScale(12),
+    marginBottom: verticalScale(10),
   },
   vehicleImage: {
-    width: moderateScale(70),
-    height: moderateScale(70),
+    width: moderateScale(64),
+    height: moderateScale(64),
   },
   vehicleName: {
-    fontSize: moderateScale(18),
+    fontSize: moderateScale(15),
     fontWeight: '700',
-    color: '#1C1C1E',
-    marginBottom: verticalScale(4),
+    fontFamily:'Poppins-Regular',
+    color: '#374151',
+    marginBottom: verticalScale(3),
     textAlign: 'center',
+    letterSpacing: -0.2,
+  },
+  vehicleNameSelected: {
+    color: '#1D4ED8',
   },
   capacityText: {
-    fontSize: moderateScale(12),
-    color: '#8E8E93',
+    fontSize: moderateScale(11),
+    color: '#9CA3AF',
+    fontFamily:'Poppins-Regular',
     textAlign: 'center',
+    fontWeight: '500',
   },
   checkmark: {
     position: 'absolute',
-    top: scale(8),
-    right: scale(8),
-    width: moderateScale(28),
-    height: moderateScale(28),
-    borderRadius: moderateScale(14),
-    backgroundColor: '#3B82F6',
+    top: scale(10),
+    right: scale(10),
+    width: moderateScale(22),
+    height: moderateScale(22),
+    borderRadius: moderateScale(11),
+    backgroundColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#3B82F6',
+    shadowColor: '#2563EB',
     shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
+    shadowOpacity: 0.45,
+    shadowRadius: 5,
     elevation: 4,
   },
-  // ─── Vehicle Details Section ──────────────────────────
+
+  // ─── Vehicle Details Section ──────────────────────────────────
   detailsSection: {
     marginBottom: verticalScale(20),
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(20),
+    padding: scale(20),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  detailsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: verticalScale(18),
+    gap: scale(8),
+  },
+  detailsDot: {
+    width: moderateScale(6),
+    height: moderateScale(22),
+    backgroundColor: '#2563EB',
+    borderRadius: moderateScale(3),
   },
   sectionTitle: {
-    fontSize: moderateScale(20),
+    fontSize: moderateScale(17),
     fontWeight: '700',
-    color: '#1C1C1E',
-    marginBottom: verticalScale(16),
+    fontFamily:'Poppins-Regular',
+    color: '#111827',
+    letterSpacing: -0.3,
   },
   inputContainer: {
-    marginBottom: verticalScale(16),
+    marginBottom: verticalScale(14),
   },
   label: {
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(12),
     fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: verticalScale(8),
+    fontFamily:'Poppins-Regular',
+    color: '#374151',
+    marginBottom: verticalScale(7),
+    letterSpacing: 0.2,
+    textTransform: 'uppercase',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: moderateScale(13),
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: scale(14),
+    minHeight: verticalScale(52),
+  },
+  inputWrapperFocused: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EEF2FF',
+  },
+  inputIcon: {
+    marginRight: scale(10),
   },
   input: {
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: scale(16),
-    paddingVertical: verticalScale(14),
-    borderRadius: moderateScale(12),
-    fontSize: moderateScale(16),
-    color: '#1C1C1E',
-    minHeight: verticalScale(50),
+    flex: 1,
+    fontSize: moderateScale(15),
+    fontFamily:'Poppins-Regular',
+    color: '#111827',
+    paddingVertical: verticalScale(12),
+    fontWeight: '500',
   },
-  // ─── Info + Footer ────────────────────────────────────
+  inputSuffix: {
+    backgroundColor: '#E5E7EB',
+    borderRadius: moderateScale(7),
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(4),
+  },
+  inputSuffixText: {
+    fontSize: moderateScale(12),
+    fontWeight: '700',
+    fontFamily:'Poppins-Regular',
+    color: '#6B7280',
+  },
+
+  // ─── Info Box ─────────────────────────────────────────────────
   infoBox: {
     flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#EEF2FF',
     padding: scale(16),
-    borderRadius: moderateScale(12),
+    borderRadius: moderateScale(14),
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    gap: scale(12),
   },
-  infoIcon: {
-    marginRight: scale(10),
+  infoIconWrap: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(10),
+    backgroundColor: '#DBEAFE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
   },
   infoText: {
     flex: 1,
     fontSize: moderateScale(13),
-    color: '#3B82F6',
-    lineHeight: moderateScale(18),
+    fontFamily:'Poppins-Regular',
+    color: '#3730A3',
+    lineHeight: moderateScale(19),
+    fontWeight: '500',
   },
+
+  // ─── Footer ───────────────────────────────────────────────────
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: scale(25),
-    paddingTop: verticalScale(16),
+    backgroundColor: '#F8F9FF',
+    paddingHorizontal: scale(20),
+    paddingTop: verticalScale(14),
     paddingBottom:
-      Platform.OS === 'ios' ? verticalScale(36) : verticalScale(20),
+      Platform.OS === 'ios' ? verticalScale(36) : verticalScale(22),
     borderTopWidth: 1,
-    borderTopColor: '#F5F5F5',
+    borderTopColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: -2},
+    shadowOffset: {width: 0, height: -4},
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 12,
+    elevation: 10,
   },
   continueButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: verticalScale(18),
-    borderRadius: moderateScale(15),
+    backgroundColor: '#2563EB',
+    paddingVertical: verticalScale(16),
+    paddingHorizontal: scale(24),
+    borderRadius: moderateScale(16),
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: verticalScale(54),
-    shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    minHeight: verticalScale(56),
+    shadowColor: '#2563EB',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 6,
   },
   buttonDisabled: {
-    backgroundColor: '#93C5FD',
+    backgroundColor: '#BFDBFE',
     shadowOpacity: 0,
     elevation: 0,
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: moderateScale(18),
+    fontSize: moderateScale(16),
     fontWeight: '700',
+    letterSpacing: 0.3,
+    marginRight: scale(8),
+  },
+  buttonArrow: {
+    width: moderateScale(30),
+    height: moderateScale(30),
+    borderRadius: moderateScale(10),
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonArrowDisabled: {
+    backgroundColor: '#EFF6FF',
   },
 });

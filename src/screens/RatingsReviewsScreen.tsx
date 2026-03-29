@@ -197,6 +197,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: moderateScale(18),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
   },
   scrollContent: {
@@ -248,6 +249,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: moderateScale(18),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(16),
   },
@@ -278,6 +280,7 @@ const styles = StyleSheet.create({
     width: scale(40),
     fontSize: moderateScale(14),
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
     color: '#666',
     textAlign: 'right',
   },
@@ -312,6 +315,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#FFFFFF',
   },
   reviewHeaderInfo: {
@@ -320,6 +324,7 @@ const styles = StyleSheet.create({
   customerName: {
     fontSize: moderateScale(15),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(2),
   },
@@ -337,11 +342,13 @@ const styles = StyleSheet.create({
   ratingBadgeText: {
     fontSize: moderateScale(13),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#F59E0B',
   },
   reviewComment: {
     fontSize: moderateScale(14),
     color: '#666',
+    fontFamily: 'Poppins-Regular',
     lineHeight: moderateScale(20),
     marginBottom: verticalScale(8),
   },
@@ -349,5 +356,6 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(12),
     color: '#8E8E93',
     fontWeight: '500',
+    fontFamily: 'Poppins-Regular',
   },
 });

@@ -14,26 +14,28 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {sendLoginOTP, getApiErrorMessage} from '../services/authService';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
-
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
 const moderateScale = (size: number, factor = 0.5) =>
   size + (scale(size) - size) * factor;
-
 const isSmallDevice = SCREEN_WIDTH < 375;
+
+// ── Brand palette ──────────────────────────────────────────────────────────────
+const BRAND       = '#1E22AD';
+const BRAND_LIGHT = '#E8E9F8';
+const BRAND_MID   = '#4347C4';
 
 export default function LoginScreen({navigation}: any) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [countryCode] = useState('+91');
   const [isLoading, setIsLoading] = useState(false);
 
+  // ── ALL LOGIC UNCHANGED ────────────────────────────────────────────────────
   const handleSendOTP = async () => {
     const trimmedPhone = phoneNumber.trim();
-
     if (trimmedPhone.length !== 10) {
       Alert.alert(
         'Invalid Number',
@@ -41,13 +43,10 @@ export default function LoginScreen({navigation}: any) {
       );
       return;
     }
-
     const fullPhone = countryCode + trimmedPhone;
     setIsLoading(true);
-
     try {
       await sendLoginOTP(fullPhone);
-
       navigation.navigate('OTPVerification', {
         phoneNumber: fullPhone,
         flow: 'login',
@@ -59,229 +58,368 @@ export default function LoginScreen({navigation}: any) {
       setIsLoading(false);
     }
   };
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const isValid = phoneNumber.length === 10;
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+      <StatusBar barStyle="light-content" backgroundColor={BRAND} />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled">
-        {/* Back Button */}
+      {/* ── Top brand hero panel ─────────────────────────────────────────── */}
+      <View style={styles.heroPanel}>
+        {/* Decorative depth circles */}
+        <View style={styles.decCircleLarge} />
+        <View style={styles.decCircleSmall} />
+
+        {/* Back button */}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.navigate('Welcome')}
           activeOpacity={0.7}
           hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-          <Ionicons
-            name="arrow-back"
-            size={moderateScale(24)}
-            color="#3B82F6"
-          />
+          <Ionicons name="arrow-back" size={moderateScale(20)} color="#FFFFFF" />
         </TouchableOpacity>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoCircle}>
-            <MaterialCommunityIcons
-              name="truck-fast"
-              size={moderateScale(isSmallDevice ? 45 : 50)}
-              color="#3B82F6"
-            />
-          </View>
-          <Text style={styles.welcomeText}>Welcome Back!</Text>
-          <Text style={styles.subtitleText}>
-            Enter your phone number to continue
+        {/* Hero text */}
+        <View style={styles.heroContent}>
+          <Text style={styles.heroTitle}>Welcome Back!</Text>
+          <Text style={styles.heroSubtitle}>
+            Sign in to your Zipto Rider account{'\n'}and start delivering.
           </Text>
         </View>
+      </View>
 
-        {/* Phone Input */}
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Phone Number</Text>
-          <View style={styles.phoneInputContainer}>
-            <View style={styles.countryCodeBox}>
-              <Text style={styles.flagEmoji}>🇮🇳</Text>
-              <Text style={styles.countryCodeText}>{countryCode}</Text>
-            </View>
-            <TextInput
-              style={styles.phoneInput}
-              placeholder="Enter phone number"
-              placeholderTextColor="#999999"
-              keyboardType="phone-pad"
-              maxLength={10}
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              autoFocus
-              editable={!isLoading}
-            />
-          </View>
+      {/* ── White form card ──────────────────────────────────────────────── */}
+      <ScrollView
+        style={styles.formCard}
+        contentContainerStyle={styles.formContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}>
+
+        {/* Step pill */}
+        <View style={styles.stepPill}>
+          <View style={styles.stepDot} />
+          <Text style={styles.stepText}>Phone Verification</Text>
         </View>
 
-        {/* Send OTP Button */}
+        {/* Label */}
+        <Text style={styles.label}>Mobile Number</Text>
+
+        {/* Phone input row */}
+        <View style={styles.phoneRow}>
+          <View style={styles.countryPill}>
+            <Text style={styles.flagEmoji}>🇮🇳</Text>
+            <Text style={styles.countryCode}>{countryCode}</Text>
+            <View style={styles.pillDivider} />
+          </View>
+          <TextInput
+            style={styles.phoneInput}
+            placeholder="00000 00000"
+            placeholderTextColor="#BCBCCC"
+            keyboardType="phone-pad"
+            maxLength={10}
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+            autoFocus
+            editable={!isLoading}
+          />
+        </View>
+
+        {/* Helper */}
+        <Text style={styles.helperText}>
+          We'll send a 6-digit OTP to verify your number.
+        </Text>
+      </ScrollView>
+
+      {/* ── Sticky bottom — always visible above keyboard ────────────────── */}
+      <View style={styles.bottomSection}>
         <TouchableOpacity
           style={[
-            styles.continueButton,
-            (phoneNumber.length !== 10 || isLoading) &&
-              styles.continueButtonDisabled,
+            styles.otpButton,
+            (!isValid || isLoading) && styles.otpButtonDisabled,
           ]}
           onPress={handleSendOTP}
-          disabled={phoneNumber.length !== 10 || isLoading}
-          activeOpacity={0.8}>
+          disabled={!isValid || isLoading}
+          activeOpacity={0.85}>
           {isLoading ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
-            <Text style={styles.continueButtonText}>Send OTP</Text>
+            <View style={styles.otpButtonInner}>
+              <Text style={styles.otpButtonText}>Send OTP</Text>
+              <Ionicons
+                name="arrow-forward"
+                size={moderateScale(18)}
+                color="#FFFFFF"
+              />
+            </View>
           )}
         </TouchableOpacity>
+
+        {/* Divider */}
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerLabel}>secure & private</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
         {/* Terms */}
         <Text style={styles.termsText}>
           By continuing, you agree to our{' '}
-          <Text style={styles.linkText}>Terms of Service</Text> and{' '}
+          <Text style={styles.linkText}>Terms of Service</Text>
+          {'  '}and{'  '}
           <Text style={styles.linkText}>Privacy Policy</Text>
         </Text>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const CARD_RADIUS = moderateScale(32);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: BRAND,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: scale(30),
-    paddingTop: Platform.OS === 'ios' ? verticalScale(50) : verticalScale(40),
-    paddingBottom: verticalScale(30),
+
+  // ── Hero panel ──────────────────────────────────────────────────────────────
+  heroPanel: {
+    backgroundColor: BRAND,
+    paddingTop:
+      Platform.OS === 'ios' ? verticalScale(58) : verticalScale(44),
+    paddingHorizontal: scale(28),
+    paddingBottom: verticalScale(36),
+    overflow: 'hidden',
   },
+
+  decCircleLarge: {
+    position: 'absolute',
+    width: scale(220),
+    height: scale(220),
+    borderRadius: scale(110),
+    backgroundColor: BRAND_MID,
+    opacity: 0.35,
+    top: -scale(60),
+    right: -scale(50),
+  },
+  decCircleSmall: {
+    position: 'absolute',
+    width: scale(120),
+    height: scale(120),
+    borderRadius: scale(60),
+    backgroundColor: BRAND_MID,
+    opacity: 0.2,
+    bottom: verticalScale(10),
+    left: -scale(30),
+  },
+
   backButton: {
-    width: moderateScale(44),
-    height: moderateScale(44),
-    borderRadius: moderateScale(22),
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginBottom: verticalScale(30),
-    shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: verticalScale(50),
-  },
-  logoCircle: {
-    width: moderateScale(100),
-    height: moderateScale(100),
-    borderRadius: moderateScale(50),
-    backgroundColor: '#EFF6FF',
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(19),
+    backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: verticalScale(24),
-    shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
-  welcomeText: {
-    fontSize: moderateScale(isSmallDevice ? 28 : 32),
+
+  heroContent: {
+    alignItems: 'flex-start',
+  },
+
+  heroTitle: {
+    fontSize: moderateScale(isSmallDevice ? 26 : 30),
     fontWeight: '800',
-    color: '#1C1C1E',
+    color: '#FFFFFF',
+    fontFamily: 'Cocon-Regular',
+    letterSpacing: 0.4,
     marginBottom: verticalScale(8),
   },
-  subtitleText: {
-    fontSize: moderateScale(16),
-    color: '#8E8E93',
-    textAlign: 'center',
-    fontWeight: '500',
-    lineHeight: moderateScale(22),
-    paddingHorizontal: scale(20),
+
+  heroSubtitle: {
+    fontSize: moderateScale(13.5),
+    color: 'rgba(255,255,255,0.70)',
+    lineHeight: moderateScale(20),
+    fontFamily: 'Poppins-Regular',
   },
-  inputSection: {
-    marginBottom: verticalScale(30),
+
+  // ── Form card ───────────────────────────────────────────────────────────────
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: CARD_RADIUS,
+    borderTopRightRadius: CARD_RADIUS,
   },
-  label: {
-    fontSize: moderateScale(14),
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: verticalScale(12),
+
+  formContent: {
+    flexGrow: 1,
+    paddingHorizontal: scale(28),
+    paddingTop: verticalScale(32),
+    paddingBottom: verticalScale(16),
   },
-  phoneInputContainer: {
+
+  stepPill: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  countryCodeBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    alignSelf: 'flex-start',
+    backgroundColor: BRAND_LIGHT,
+    borderRadius: moderateScale(20),
     paddingHorizontal: scale(12),
-    paddingVertical: verticalScale(18),
-    borderRadius: moderateScale(12),
-    marginRight: scale(12),
-    gap: scale(8),
-    minHeight: verticalScale(54),
+    paddingVertical: verticalScale(6),
+    marginBottom: verticalScale(28),
+    gap: scale(6),
+  },
+  stepDot: {
+    width: moderateScale(7),
+    height: moderateScale(7),
+    borderRadius: moderateScale(4),
+    backgroundColor: BRAND,
+  },
+  stepText: {
+    fontSize: moderateScale(11.5),
+    color: BRAND,
+    fontFamily: 'Poppins-SemiBold',
+    letterSpacing: 0.2,
+  },
+
+  label: {
+    fontSize: moderateScale(13),
+    fontWeight: '700',
+    color: '#1C1C2E',
+    fontFamily: 'Poppins-SemiBold',
+    marginBottom: verticalScale(10),
+    letterSpacing: 0.3,
+  },
+
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E4E4EF',
+    borderRadius: moderateScale(14),
+    backgroundColor: '#FAFAFE',
+    overflow: 'hidden',
+    marginBottom: verticalScale(10),
+  },
+
+  countryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: scale(14),
+    paddingVertical: verticalScale(16),
+    gap: scale(6),
+    backgroundColor: '#F1F1FA',
   },
   flagEmoji: {
-    fontSize: moderateScale(24),
+    fontSize: moderateScale(20),
   },
-  countryCodeText: {
-    fontSize: moderateScale(16),
-    fontWeight: '600',
-    color: '#1C1C1E',
+  countryCode: {
+    fontSize: moderateScale(15),
+    fontWeight: '700',
+    color: '#1C1C2E',
+    fontFamily: 'Poppins-Bold',
   },
+  pillDivider: {
+    width: 1,
+    height: moderateScale(22),
+    backgroundColor: '#D8D8E8',
+    marginLeft: scale(8),
+  },
+
   phoneInput: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
     paddingHorizontal: scale(16),
-    paddingVertical: verticalScale(18),
-    borderRadius: moderateScale(12),
-    fontSize: moderateScale(16),
-    fontWeight: '600',
-    color: '#1C1C1E',
-    minHeight: verticalScale(54),
+    paddingVertical: verticalScale(16),
+    fontSize: moderateScale(17),
+    fontWeight: '700',
+    color: '#1C1C2E',
+    fontFamily: 'Poppins-Bold',
+    letterSpacing: 1.5,
   },
-  continueButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: verticalScale(18),
-    borderRadius: moderateScale(15),
+
+  helperText: {
+    fontSize: moderateScale(12),
+    color: '#9898B0',
+    fontFamily: 'Poppins-Regular',
+    marginBottom: verticalScale(8),
+    letterSpacing: 0.1,
+  },
+
+  // ── Sticky bottom ───────────────────────────────────────────────────────────
+  bottomSection: {
+    paddingHorizontal: scale(28),
+    paddingTop: verticalScale(16),
+    paddingBottom:
+      Platform.OS === 'ios' ? verticalScale(36) : verticalScale(24),
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    gap: verticalScale(12),
+  },
+
+  otpButton: {
+    backgroundColor: BRAND,
+    borderRadius: moderateScale(14),
+    paddingVertical: verticalScale(17),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: verticalScale(20),
-    minHeight: verticalScale(54),
-    shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowColor: BRAND,
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  continueButtonDisabled: {
-    backgroundColor: '#93C5FD',
+  otpButtonDisabled: {
+    backgroundColor: '#A8AADC',
     shadowOpacity: 0,
     elevation: 0,
   },
-  continueButtonText: {
-    color: '#FFFFFF',
-    fontSize: moderateScale(18),
-    fontWeight: '700',
+  otpButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
   },
+  otpButtonText: {
+    color: '#FFFFFF',
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
+    letterSpacing: 0.5,
+  },
+
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(10),
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#EBEBF5',
+  },
+  dividerLabel: {
+    fontSize: moderateScale(11),
+    color: '#BCBCCC',
+    fontFamily: 'Poppins-Regular',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+
   termsText: {
-    fontSize: moderateScale(13),
-    color: '#8E8E93',
+    fontSize: moderateScale(12.5),
+    color: '#9898B0',
     textAlign: 'center',
     lineHeight: moderateScale(20),
+    fontFamily: 'Poppins-Regular',
     paddingHorizontal: scale(10),
   },
   linkText: {
-    color: '#3B82F6',
-    fontWeight: '600',
+    color: BRAND,
+    fontFamily: 'Poppins-SemiBold',
   },
 });

@@ -93,6 +93,7 @@ const styles = StyleSheet.create({
   headerTitle: { 
     fontSize: moderateScale(18), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     flex: 1,
     textAlign: 'center',
@@ -101,6 +102,7 @@ const styles = StyleSheet.create({
   clearText: { 
     fontSize: moderateScale(14), 
     fontWeight: '600', 
+    fontFamily: 'Poppins-Regular',
     color: '#FF6B35' 
   },
   scrollContent: { 
@@ -135,18 +137,21 @@ const styles = StyleSheet.create({
   notifTitle: { 
     fontSize: moderateScale(16), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E', 
     flex: 1,
     marginRight: scale(8),
   },
   notifTime: { 
     fontSize: moderateScale(12), 
+    fontFamily: 'Poppins-Regular',
     color: '#8E8E93',
     flexShrink: 0,
   },
   notifMessage: { 
     fontSize: moderateScale(14), 
     color: '#666', 
+    fontFamily: 'Poppins-Regular',
     lineHeight: moderateScale(20) 
   },
   unreadDot: { 

@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
   headerTitle: { 
     fontSize: moderateScale(18), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E' 
   },
   scrollContent: { 
@@ -146,6 +147,7 @@ const styles = StyleSheet.create({
   sectionTitle: { 
     fontSize: moderateScale(16), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E', 
     marginBottom: verticalScale(12) 
   },

@@ -186,12 +186,14 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: moderateScale(22), 
-    fontWeight: '800', 
+    fontWeight: '800',
+    fontFamily: 'Poppins-Regular', 
     color: '#1C1C1E'
   },
   bankLink: {
     fontSize: moderateScale(14), 
     fontWeight: '600', 
+    fontFamily: 'Poppins-Regular',
     color: '#3B82F6'
   },
 
@@ -223,7 +225,8 @@ const styles = StyleSheet.create({
   },
   periodText: {
     fontSize: moderateScale(13), 
-    fontWeight: '600', 
+    fontWeight: '600',
+    fontFamily: 'Poppins-Regular', 
     color: '#64748B'
   },
   periodTextActive: {
@@ -254,7 +257,8 @@ const styles = StyleSheet.create({
   },
   totalValue: {
     fontSize: moderateScale(isSmallDevice ? 32 : 36), 
-    fontWeight: '800', 
+    fontWeight: '800',
+    fontFamily: 'Poppins-Regular', 
     color: '#FFF',
     marginBottom: verticalScale(12),
   },
@@ -274,7 +278,8 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: moderateScale(18), 
-    fontWeight: '700', 
+    fontWeight: '700',
+    fontFamily: 'Poppins-Regular', 
     color: '#FFF',
     marginBottom: verticalScale(4),
   },
@@ -312,6 +317,7 @@ const styles = StyleSheet.create({
   rowValue: {
     fontSize: moderateScale(14), 
     fontWeight: '700', 
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E'
   },
 
@@ -331,6 +337,7 @@ const styles = StyleSheet.create({
   noticeText: {
     fontSize: moderateScale(13), 
     color: '#3B82F6', 
+    fontFamily: 'Poppins-Regular',
     flex: 1,
     lineHeight: moderateScale(18),
   },
@@ -355,6 +362,7 @@ const styles = StyleSheet.create({
   withdrawText: {
     color: '#FFF', 
     fontSize: moderateScale(15), 
-    fontWeight: '700'
+    fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
   },
 });

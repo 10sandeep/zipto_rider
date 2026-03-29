@@ -582,11 +582,13 @@ const styles = StyleSheet.create({
   onlineTitle: {
     fontSize: moderateScale(18),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(4),
   },
   onlineSubtitle: {
     fontSize: moderateScale(14),
+    fontFamily: 'Poppins-Regular',
     color: '#8E8E93',
   },
   currentOrderCard: {
@@ -618,6 +620,7 @@ const styles = StyleSheet.create({
   currentOrderTitle: {
     fontSize: moderateScale(18),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#3B82F6',
   },
   amountBadge: {
@@ -629,6 +632,7 @@ const styles = StyleSheet.create({
   amountText: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#3B82F6',
   },
   orderInfo: {
@@ -649,10 +653,12 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(4),
     textTransform: 'uppercase',
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
   },
   orderValue: {
     fontSize: moderateScale(14),
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     lineHeight: moderateScale(20),
   },
@@ -674,6 +680,7 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14),
     color: '#8E8E93',
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
   },
   viewDetailsButton: {
     backgroundColor: '#3B82F6',
@@ -694,6 +701,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -719,6 +727,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: moderateScale(isSmallDevice ? 20 : 24),
     fontWeight: '800',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(4),
   },
@@ -776,11 +785,13 @@ const styles = StyleSheet.create({
   markerText: {
     fontSize: moderateScale(12),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#3B82F6',
     marginBottom: verticalScale(4),
   },
   markerAddress: {
     fontSize: moderateScale(11),
+    fontFamily: 'Poppins-Regular',
     color: '#6B7280',
   },
 
@@ -802,6 +813,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: moderateScale(22),
     fontWeight: '800',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(20),
     textAlign: 'center',
@@ -820,6 +832,7 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(16),
     color: '#1C1C1E',
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     flex: 1,
     textAlign: 'right',
     marginLeft: scale(10),
@@ -828,6 +841,7 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(20),
     color: '#16A34A',
     fontWeight: '800',
+    fontFamily: 'Poppins-Regular',
   },
   modalActions: {
     flexDirection: 'row',
@@ -848,6 +862,7 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
   },
   acceptButton: {
     backgroundColor: '#3B82F6',
@@ -856,6 +871,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
   },
 });
 

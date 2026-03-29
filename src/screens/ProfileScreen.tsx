@@ -170,11 +170,13 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: moderateScale(32),
     fontWeight: '800',
+    fontFamily: 'Poppins-Regular',
     color: '#FFFFFF',
   },
   name: {
     fontSize: moderateScale(24),
     fontWeight: '800',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
     marginBottom: verticalScale(4),
   },
@@ -191,6 +193,7 @@ const styles = StyleSheet.create({
   rating: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
   },
   ratingText: {
     fontSize: moderateScale(14),
@@ -219,12 +222,14 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: moderateScale(isSmallDevice ? 24 : 28),
     fontWeight: '800',
+    fontFamily: 'Poppins-Regular',
     color: '#3B82F6',
     marginBottom: verticalScale(4),
   },
   statLabel: {
     fontSize: moderateScale(13),
     color: '#8E8E93',
+    fontFamily: 'Poppins-Regular',
     textAlign: 'center',
   },
   menuSection: {
@@ -255,6 +260,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: moderateScale(16),
     fontWeight: '600',
+    fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
   },
   logoutButton: {
@@ -274,6 +280,7 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    fontFamily: 'Poppins-Regular',
     color: '#EF4444',
   },
 });
