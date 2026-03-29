@@ -1,6 +1,7 @@
 import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {useAuthStore} from '../store/authStore';
 
 // Import Tab Navigator
 import TabNavigator from '../navigation/TabNavigation';
@@ -53,7 +54,7 @@ export type RootStackParamList = {
 
   // Orders
   OrderDetails: {orderId: string};
-  Navigation: {orderId: string; destination: any};
+  Navigation: {bookingId: string};
 
   // Profile & Settings
   Settings: undefined;
@@ -67,51 +68,62 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+const screenOptions = {headerShown: false, animation: 'slide_from_right' as const};
+
 // Main App Navigation
 export default function AppNavigation() {
+  const {isAuthenticated, isHydrated} = useAuthStore();
+
+  // Wait for Zustand to rehydrate from AsyncStorage before deciding which stack to show
+  if (!isHydrated) {
+    return (
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={screenOptions}>
+          <Stack.Screen name="Splash" component={SplashScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Splash"
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-        }}>
-        {/* ==================== AUTH & ONBOARDING ==================== */}
-        <Stack.Screen name="Splash" component={SplashScreen} />
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen
-          name="OTPVerification"
-          component={OTPVerificationScreen}
-        />
-
-        {/* ==================== KYC FLOW ==================== */}
-        <Stack.Screen
-          name="KYCVehicleRegistration"
-          component={KYCVehicleRegistrationScreen}
-        />
-        <Stack.Screen name="DocumentUpload" component={DocumentUploadScreen} />
-        <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-        <Stack.Screen name="KYCStatus" component={KYCStatusScreen} />
-
-        {/* ==================== MAIN APP (TABS) ==================== */}
-        <Stack.Screen name="MainTabs" component={TabNavigator} />
-
-        {/* ==================== ORDER SCREENS ==================== */}
-        <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
-        <Stack.Screen name="Navigation" component={NavigationScreen} />
-
-        {/* ==================== PROFILE & SETTINGS ==================== */}
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
-        <Stack.Screen name="Support" component={SupportScreen} />
-        <Stack.Screen name="VehicleDetails" component={VehicleDetailsScreen} />
-        <Stack.Screen name="BankDetails" component={BankDetailsScreen} />
-        <Stack.Screen name="RatingsReviews" component={RatingsReviewsScreen} />
-        <Stack.Screen name="Attendance" component={AttendanceScreen} />
+      <Stack.Navigator screenOptions={screenOptions}>
+        {!isAuthenticated ? (
+          // ── AUTH STACK ─────────────────────────────────────────────
+          // Shown when logged out or JWT expired (clearAuth was called)
+          <>
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
+            <Stack.Screen name="KYCVehicleRegistration" component={KYCVehicleRegistrationScreen} />
+            <Stack.Screen name="DocumentUpload" component={DocumentUploadScreen} />
+            <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+            <Stack.Screen name="KYCStatus" component={KYCStatusScreen} />
+          </>
+        ) : (
+          // ── APP STACK ──────────────────────────────────────────────
+          // Shown when authenticated
+          <>
+            <Stack.Screen name="Splash" component={SplashScreen} />
+            <Stack.Screen name="MainTabs" component={TabNavigator} />
+            {/* KYC screens needed for newly registered drivers who are authenticated but haven't completed KYC */}
+            <Stack.Screen name="KYCVehicleRegistration" component={KYCVehicleRegistrationScreen} />
+            <Stack.Screen name="DocumentUpload" component={DocumentUploadScreen} />
+            <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+            <Stack.Screen name="KYCStatus" component={KYCStatusScreen} />
+            <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
+            <Stack.Screen name="Navigation" component={NavigationScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="Support" component={SupportScreen} />
+            <Stack.Screen name="VehicleDetails" component={VehicleDetailsScreen} />
+            <Stack.Screen name="BankDetails" component={BankDetailsScreen} />
+            <Stack.Screen name="RatingsReviews" component={RatingsReviewsScreen} />
+            <Stack.Screen name="Attendance" component={AttendanceScreen} />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -42,8 +42,18 @@ export default function ProfileScreen({navigation}: any) {
     return name.substring(0, 2).toUpperCase();
   };
 
-  const displayName = profile?.name || user?.name || 'Driver Partner';
-  const displayPhone = profile?.phone || user?.phone || 'No phone provided';
+  // profile.name is now surfaced from user.name by the backend;
+  // fall back to nested user object (older API shape) then auth store user
+  const displayName =
+    profile?.name ||
+    (profile as any)?.user?.name ||
+    user?.name ||
+    'Driver Partner';
+  const displayPhone =
+    profile?.phone ||
+    (profile as any)?.user?.phone ||
+    user?.phone ||
+    'No phone provided';
   const rating = profile?.average_rating
     ? Number(profile.average_rating).toFixed(1)
     : 'New';

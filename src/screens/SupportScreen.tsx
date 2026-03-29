@@ -15,9 +15,9 @@ const isMediumDevice = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
 const isLargeDevice = SCREEN_WIDTH >= 414;
 
 export default function SupportScreen({ navigation }: any) {
-  const handleCall = () => Linking.openURL('tel:1800123456');
-  const handleEmail = () => Linking.openURL('mailto:support@quickdeliver.com');
-  const handleWhatsApp = () => Linking.openURL('https://wa.me/918765432100');
+  const handleCall = () => Linking.openURL('tel:+919090029996');
+  const handleEmail = () => Linking.openURL('mailto:supportzipto@gmail.com');
+  const handleWhatsApp = () => Linking.openURL('https://wa.me/919090029996');
 
   return (
     <View style={styles.container}>
@@ -41,7 +41,7 @@ export default function SupportScreen({ navigation }: any) {
         <View style={styles.heroCard}>
           <Text style={styles.heroIcon}>💬</Text>
           <Text style={styles.heroTitle}>How can we help you?</Text>
-          <Text style={styles.heroSubtitle}>We're here 24/7 to assist you</Text>
+          <Text style={styles.heroSubtitle}>We're here 24×7 to assist you</Text>
         </View>
 
         <View style={styles.section}>
@@ -56,7 +56,7 @@ export default function SupportScreen({ navigation }: any) {
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Call Support</Text>
-              <Text style={styles.contactValue}>1800-123-456</Text>
+              <Text style={styles.contactValue}>+91 90900 29996</Text>
             </View>
             <Ionicons name="chevron-forward" size={moderateScale(20)} color="#8E8E93" />
           </TouchableOpacity>
@@ -71,7 +71,7 @@ export default function SupportScreen({ navigation }: any) {
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>WhatsApp</Text>
-              <Text style={styles.contactValue}>+91 87654 32100</Text>
+              <Text style={styles.contactValue}>+91 90900 29996</Text>
             </View>
             <Ionicons name="chevron-forward" size={moderateScale(20)} color="#8E8E93" />
           </TouchableOpacity>
@@ -86,7 +86,7 @@ export default function SupportScreen({ navigation }: any) {
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Email</Text>
-              <Text style={styles.contactValue}>support@quickdeliver.com</Text>
+              <Text style={styles.contactValue}>supportzipto@gmail.com</Text>
             </View>
             <Ionicons name="chevron-forward" size={moderateScale(20)} color="#8E8E93" />
           </TouchableOpacity>

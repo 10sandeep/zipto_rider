@@ -178,8 +178,7 @@ export default function DocumentUploadScreen({navigation}: any) {
           setFileUris(prev => ({...prev, [doc.id]: result.assets![0].uri!}));
         }
       }
-    } catch (error) {
-      console.log(error);
+    } catch {
       Alert.alert('Error', 'Failed to open camera or gallery.');
     }
   }, []);

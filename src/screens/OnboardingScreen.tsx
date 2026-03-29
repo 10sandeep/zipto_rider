@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import {useAuthStore} from '../store/authStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -42,6 +43,7 @@ const slides = [
 export default function OnboardingScreen({ navigation }: any) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const setHasSeenOnboarding = useAuthStore(s => s.setHasSeenOnboarding);
 
   const handleNext = () => {
     if (currentIndex < slides.length - 1) {
@@ -49,11 +51,13 @@ export default function OnboardingScreen({ navigation }: any) {
       flatListRef.current?.scrollToIndex({ index: nextIndex });
       setCurrentIndex(nextIndex);
     } else {
+      setHasSeenOnboarding(true);
       navigation.replace('Welcome');
     }
   };
 
   const handleSkip = () => {
+    setHasSeenOnboarding(true);
     navigation.replace('Welcome');
   };
 

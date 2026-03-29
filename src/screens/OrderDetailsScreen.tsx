@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,11 @@ import {
   ScrollView,
   Dimensions,
   Platform,
+  ActivityIndicator,
+  Linking,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import {getBookingById, ActiveBooking} from '../services/driverService';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -18,100 +21,142 @@ const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
 const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
 
-// Responsive helpers
-const isSmallDevice = SCREEN_WIDTH < 375;
-const isMediumDevice = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
-const isLargeDevice = SCREEN_WIDTH >= 414;
-
 export default function OrderDetailsScreen({route, navigation}: any) {
   const {orderId} = route.params;
+  const [booking, setBooking] = useState<ActiveBooking | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getBookingById(orderId).then(data => {
+      setBooking(data);
+      setLoading(false);
+    });
+  }, [orderId]);
+
+  const statusLabel = booking?.status
+    ? booking.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    : 'In Progress';
+
+  const paymentMethod = booking?.payments?.[0]?.payment_method ?? (booking?.paid_by === 'receiver' ? 'Cash (Receiver Pays)' : 'Cash (Sender Pays)');
+
+  const handleCallCustomer = () => {
+    const phone = booking?.receiver_phone || booking?.alternative_phone;
+    if (phone) {
+      Linking.openURL(`tel:${phone}`);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-          activeOpacity={0.7}
-        >
+          activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={moderateScale(24)} color="#3B82F6" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Order Details</Text>
         <View style={{width: moderateScale(24)}} />
       </View>
 
-      <ScrollView 
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.orderIdCard}>
-          <Text style={styles.orderIdLabel}>Order ID</Text>
-          <Text style={styles.orderIdValue}>{orderId}</Text>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>● In Progress</Text>
-          </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3B82F6" />
         </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pickup Location</Text>
-          <View style={styles.locationCard}>
-            <Text style={styles.locationIcon}>📍</Text>
-            <View style={styles.locationInfo}>
-              <Text style={styles.locationName}>ABC Store</Text>
-              <Text style={styles.locationAddress}>
-                MG Road, Bangalore - 560001
-              </Text>
-              <Text style={styles.locationContact}>
-                Contact: +91 98765 43210
-              </Text>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.orderIdCard}>
+            <Text style={styles.orderIdLabel}>Order ID</Text>
+            <Text style={styles.orderIdValue}>{orderId}</Text>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusText}>● {statusLabel}</Text>
             </View>
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Delivery Location</Text>
-          <View style={styles.locationCard}>
-            <Text style={styles.locationIcon}>🎯</Text>
-            <View style={styles.locationInfo}>
-              <Text style={styles.locationName}>John Doe</Text>
-              <Text style={styles.locationAddress}>
-                123 Main Street, Chennai - 600001
-              </Text>
-              <Text style={styles.locationContact}>
-                Contact: +91 98765 12345
-              </Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Pickup Location</Text>
+            <View style={styles.locationCard}>
+              <Text style={styles.locationIcon}>📍</Text>
+              <View style={styles.locationInfo}>
+                <Text style={styles.locationName}>Pickup</Text>
+                <Text style={styles.locationAddress}>
+                  {booking?.pickup_address || 'N/A'}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Package Details</Text>
-          <View style={styles.detailsCard}>
-            <DetailRow label="Package Type" value="Documents" />
-            <DetailRow label="Weight" value="2 kg" />
-            <DetailRow label="Distance" value="5.2 km" />
-            <DetailRow label="Payment Method" value="Cash on Delivery" />
-            <DetailRow label="Delivery Fee" value="₹250" />
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Delivery Location</Text>
+            <View style={styles.locationCard}>
+              <Text style={styles.locationIcon}>🎯</Text>
+              <View style={styles.locationInfo}>
+                <Text style={styles.locationName}>
+                  {booking?.receiver_name || 'Receiver'}
+                </Text>
+                <Text style={styles.locationAddress}>
+                  {booking?.drop_address || 'N/A'}
+                </Text>
+                {(booking?.receiver_phone || booking?.alternative_phone) && (
+                  <Text style={styles.locationContact}>
+                    Contact: {booking?.receiver_phone || booking?.alternative_phone}
+                  </Text>
+                )}
+              </View>
+            </View>
           </View>
-        </View>
-      </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.callButton}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.callButtonText}>📞 Call Customer</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navigateButton}
-          onPress={() => navigation.navigate('Navigation', {orderId})}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.navigateButtonText}>Start Navigation</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Package Details</Text>
+            <View style={styles.detailsCard}>
+              {booking?.vehicle_type && (
+                <DetailRow label="Vehicle Type" value={booking.vehicle_type} />
+              )}
+              {booking?.distance != null && (
+                <DetailRow
+                  label="Distance"
+                  value={`${Number(booking.distance).toFixed(1)} km`}
+                />
+              )}
+              <DetailRow label="Payment" value={paymentMethod} />
+              <DetailRow
+                label="Delivery Fee"
+                value={`₹${booking?.estimated_fare ?? 0}`}
+              />
+              {booking?.has_toll && booking.toll_amount > 0 && (
+                <DetailRow
+                  label="Toll Charges"
+                  value={`₹${booking.toll_amount}`}
+                />
+              )}
+            </View>
+          </View>
+        </ScrollView>
+      )}
+
+      {!loading && (
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[
+              styles.callButton,
+              !(booking?.receiver_phone || booking?.alternative_phone) && styles.callButtonDisabled,
+            ]}
+            activeOpacity={0.7}
+            onPress={handleCallCustomer}
+            disabled={!(booking?.receiver_phone || booking?.alternative_phone)}>
+            <Text style={styles.callButtonText}>📞 Call Customer</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.navigateButton}
+            onPress={() => navigation.navigate('Navigation', {orderId})}
+            activeOpacity={0.8}>
+            <Text style={styles.navigateButtonText}>Start Navigation</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -125,8 +170,8 @@ const DetailRow = ({label, value}: {label: string; value: string}) => (
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, 
-    backgroundColor: '#F8F9FA'
+    flex: 1,
+    backgroundColor: '#F8F9FA',
   },
   header: {
     flexDirection: 'row',
@@ -145,14 +190,18 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   headerTitle: {
-    fontSize: moderateScale(18), 
+    fontSize: moderateScale(18),
     fontWeight: '700',
-    fontFamily: 'Poppins-Regular', 
-    color: '#1C1C1E'
+    color: '#1C1C1E',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
-    paddingHorizontal: scale(20), 
-    paddingBottom: verticalScale(120)
+    paddingHorizontal: scale(20),
+    paddingBottom: verticalScale(120),
   },
   orderIdCard: {
     backgroundColor: '#FFFFFF',
@@ -167,9 +216,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   orderIdLabel: {
-    fontSize: moderateScale(14), 
-    color: '#8E8E93', 
-    marginBottom: verticalScale(8)
+    fontSize: moderateScale(14),
+    color: '#8E8E93',
+    marginBottom: verticalScale(8),
   },
   orderIdValue: {
     fontSize: moderateScale(20),
@@ -185,13 +234,12 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(20),
   },
   statusText: {
-    fontSize: moderateScale(13), 
+    fontSize: moderateScale(13),
     fontWeight: '600',
-    fontFamily: 'Poppins-Regular', 
-    color: '#F59E0B'
+    color: '#F59E0B',
   },
   section: {
-    marginTop: verticalScale(20)
+    marginTop: verticalScale(20),
   },
   sectionTitle: {
     fontSize: moderateScale(16),
@@ -212,11 +260,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   locationIcon: {
-    fontSize: moderateScale(24), 
-    marginRight: scale(12)
+    fontSize: moderateScale(24),
+    marginRight: scale(12),
   },
   locationInfo: {
-    flex: 1
+    flex: 1,
   },
   locationName: {
     fontSize: moderateScale(16),
@@ -227,20 +275,18 @@ const styles = StyleSheet.create({
   },
   locationAddress: {
     fontSize: moderateScale(14),
-    fontFamily: 'Poppins-Regular', 
-    color: '#666', 
+    color: '#666',
     marginBottom: verticalScale(4),
     lineHeight: moderateScale(20),
   },
   locationContact: {
-    fontSize: moderateScale(13), 
-    color: '#3B82F6', 
+    fontSize: moderateScale(13),
+    color: '#3B82F6',
     fontWeight: '600',
-    fontFamily: 'Poppins-Regular',
   },
   detailsCard: {
-    backgroundColor: '#FFFFFF', 
-    padding: scale(16), 
+    backgroundColor: '#FFFFFF',
+    padding: scale(16),
     borderRadius: moderateScale(12),
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
@@ -258,15 +304,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   detailLabel: {
-    fontSize: moderateScale(14), 
+    fontSize: moderateScale(14),
     color: '#666',
     fontFamily: 'Poppins-Regular',
     flex: 1,
   },
   detailValue: {
-    fontSize: moderateScale(14), 
-    fontWeight: '600', 
-    fontFamily: 'Poppins-Regular',
+    fontSize: moderateScale(14),
+    fontWeight: '600',
     color: '#1C1C1E',
     textAlign: 'right',
   },
@@ -302,11 +347,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  callButtonDisabled: {
+    opacity: 0.5,
+  },
   callButtonText: {
-    fontSize: moderateScale(16), 
-    fontWeight: '700', 
-    fontFamily: 'Poppins-Regular',
-    color: '#1C1C1E'
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
   navigateButton: {
     flex: 1,
@@ -323,9 +370,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   navigateButtonText: {
-    fontSize: moderateScale(16), 
-    fontWeight: '700', 
-    fontFamily: 'Poppins-Regular',
-    color: '#FFFFFF'
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

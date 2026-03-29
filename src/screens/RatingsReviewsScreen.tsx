@@ -143,18 +143,63 @@ export default function RatingsReviewsScreen({navigation}: any) {
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.reviewComment}>{review.review}</Text>
-                  {review.order && (
-                    <Text style={styles.orderId}>
-                      Order: {review.order.order_number}
-                    </Text>
+
+                  {/* Review comment */}
+                  {review.comment ? (
+                    <View style={styles.commentContainer}>
+                      <Ionicons name="chatbubble-outline" size={moderateScale(14)} color="#64748B" />
+                      <Text style={styles.reviewComment}>{review.comment}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.noComment}>No comment</Text>
                   )}
+
+                  {/* Booking details */}
+                  {review.booking && (
+                    <View style={styles.bookingDetails}>
+                      {review.booking.pickup_address && (
+                        <View style={styles.bookingRow}>
+                          <Ionicons name="location" size={moderateScale(12)} color="#3B82F6" />
+                          <Text style={styles.bookingText} numberOfLines={1}>{review.booking.pickup_address}</Text>
+                        </View>
+                      )}
+                      {review.booking.drop_address && (
+                        <View style={styles.bookingRow}>
+                          <Ionicons name="location" size={moderateScale(12)} color="#10B981" />
+                          <Text style={styles.bookingText} numberOfLines={1}>{review.booking.drop_address}</Text>
+                        </View>
+                      )}
+                      <View style={styles.bookingMeta}>
+                        {review.booking.final_fare && (
+                          <View style={styles.metaChip}>
+                            <Text style={styles.metaChipText}>₹{parseFloat(review.booking.final_fare).toFixed(0)}</Text>
+                          </View>
+                        )}
+                        {review.booking.distance && (
+                          <View style={styles.metaChip}>
+                            <Text style={styles.metaChipText}>{parseFloat(review.booking.distance).toFixed(1)} km</Text>
+                          </View>
+                        )}
+                        {review.booking.vehicle_type && (
+                          <View style={styles.metaChip}>
+                            <Text style={styles.metaChipText}>{review.booking.vehicle_type}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  <Text style={styles.orderId}>
+                    Order #{review.booking_id?.slice(0, 8)}
+                  </Text>
                 </View>
               );
             })
           ) : (
             <View style={{alignItems: 'center', marginTop: 20}}>
-              <Text style={{color: '#666'}}>No reviews found.</Text>
+              <Ionicons name="star-outline" size={moderateScale(48)} color="#CBD5E1" />
+              <Text style={{color: '#666', marginTop: 12, fontSize: moderateScale(15)}}>No reviews yet</Text>
+              <Text style={{color: '#94A3B8', marginTop: 4, fontSize: moderateScale(13)}}>Complete deliveries to get rated by customers</Text>
             </View>
           )}
         </View>
@@ -345,12 +390,60 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
     color: '#F59E0B',
   },
+  commentContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: scale(8),
+    backgroundColor: '#F8FAFC',
+    padding: scale(12),
+    borderRadius: moderateScale(10),
+    marginBottom: verticalScale(10),
+  },
   reviewComment: {
+    flex: 1,
     fontSize: moderateScale(14),
-    color: '#666',
-    fontFamily: 'Poppins-Regular',
+    color: '#334155',
     lineHeight: moderateScale(20),
+  },
+  noComment: {
+    fontSize: moderateScale(13),
+    color: '#94A3B8',
+    fontStyle: 'italic',
+    marginBottom: verticalScale(10),
+  },
+  bookingDetails: {
+    backgroundColor: '#F1F5F9',
+    padding: scale(10),
+    borderRadius: moderateScale(8),
     marginBottom: verticalScale(8),
+    gap: verticalScale(6),
+  },
+  bookingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(6),
+  },
+  bookingText: {
+    flex: 1,
+    fontSize: moderateScale(12),
+    color: '#475569',
+  },
+  bookingMeta: {
+    flexDirection: 'row',
+    gap: scale(8),
+    marginTop: verticalScale(4),
+  },
+  metaChip: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: scale(8),
+    paddingVertical: verticalScale(3),
+    borderRadius: moderateScale(6),
+  },
+  metaChipText: {
+    fontSize: moderateScale(11),
+    fontWeight: '600',
+    color: '#475569',
+    textTransform: 'capitalize',
   },
   orderId: {
     fontSize: moderateScale(12),

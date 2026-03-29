@@ -61,7 +61,6 @@ export default function OTPVerificationScreen({navigation, route}: any) {
         require('../services/driverService');
 
       const statusData = await getVerificationStatus();
-      console.log('[OTP] Verification status:', statusData);
 
       if (statusData.verification_status === 'APPROVED') {
         navigation.replace('MainTabs');
@@ -84,15 +83,15 @@ export default function OTPVerificationScreen({navigation, route}: any) {
             profile?.email?.trim() &&
             profile?.address?.trim(),
         );
-      } catch (profileError) {
-        console.log('[OTP] Profile fetch failed:', profileError);
+      } catch {
+        // profile fetch failed — continue with defaults
       }
 
       try {
         const vehicles = await getMyVehicles();
         hasVehicle = Array.isArray(vehicles) && vehicles.length > 0;
-      } catch (vehicleError) {
-        console.log('[OTP] Vehicle fetch failed:', vehicleError);
+      } catch {
+        // vehicle fetch failed — continue with defaults
       }
 
       navigation.replace(
@@ -164,13 +163,21 @@ export default function OTPVerificationScreen({navigation, route}: any) {
     setIsVerifying(true);
     try {
       const response = await verifyOTP(phoneNumber, otpCode, 'driver');
-      const safeUser = response.user ?? {id: '', phone: phoneNumber, role: 'driver'};
+
+      // Build a safe user — API returns user with snake_case fields
+      const safeUser = response.user ?? {
+        id: '',
+        phone: phoneNumber,
+        role: 'driver',
+      };
+
+      // Persist token and user in store (API uses access_token / refresh_token)
       setAuth(response.access_token, safeUser, response.refresh_token);
 
       try {
         await resolvePostOtpRoute(flow);
-      } catch (err: any) {
-        console.log('[OTP] Post-OTP route resolution failed:', err.message);
+      } catch {
+        // Safe fallback: start onboarding when route resolution fails.
         navigation.replace('KYCVehicleRegistration');
       }
     } catch (error) {

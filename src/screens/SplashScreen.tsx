@@ -45,8 +45,7 @@ const hasOnboardingData = async (): Promise<boolean> => {
     );
     const hasVehicle = Array.isArray(vehicles) && vehicles.length > 0;
     return hasRequiredProfileData && hasVehicle;
-  } catch (error) {
-    console.log('[SplashScreen] onboarding check error:', error);
+  } catch {
     return false;
   }
 };
@@ -131,6 +130,7 @@ const SplashScreen = () => {
     isHydrated,
     profile,
     onboardingSubmitted,
+    hasSeenOnboarding,
     setProfile,
     setOnboardingSubmitted,
   } = useAuthStore();
@@ -138,16 +138,15 @@ const SplashScreen = () => {
   const [nextRoute,      setNextRoute]      = useState<string | null>(null);
   const [isAnimComplete, setIsAnimComplete] = useState(false);
 
-  const backgroundOpacity = useRef(new Animated.Value(0)).current;
-  const poweredOpacity    = useRef(new Animated.Value(0)).current;
-
-  // ─── ROUTING LOGIC ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isHydrated) return;
+    if (!isHydrated) {
+      return;
+    }
 
     const hasJwt = Boolean(token);
     if (!isAuthenticated && !hasJwt) {
-      setNextRoute('Onboarding');
+      const dest = hasSeenOnboarding ? 'Welcome' : 'Onboarding';
+      setNextRoute(dest);
       return;
     }
 
@@ -173,7 +172,11 @@ const SplashScreen = () => {
         clearTimeout(timeoutFallback);
 
         if (status.verification_status === 'APPROVED') {
-          getDriverProfile().then(setProfile).catch(() => {});
+          // Pre-fetch profile if approved
+          getDriverProfile()
+            .then(p => setProfile(p))
+            .catch(() => {});
+
           setNextRoute('MainTabs');
         } else {
           if (onboardingSubmitted) {
@@ -193,6 +196,14 @@ const SplashScreen = () => {
           setNextRoute('KYCVehicleRegistration');
           return;
         }
+
+        // 401 means both access and refresh tokens are expired -> force re-login.
+        if (statusCode === 401) {
+          setNextRoute('Welcome');
+          return;
+        }
+
+        // Fallback to cached profile if offline or other error
         if (cachedProfile?.verification_status === 'APPROVED') {
           setNextRoute('MainTabs');
         } else if (cachedProfile?.verification_status) {
@@ -204,7 +215,16 @@ const SplashScreen = () => {
     };
 
     checkStatus();
-  }, [isHydrated]);
+  }, [
+    isHydrated,
+    isAuthenticated,
+    token,
+    hasSeenOnboarding,
+    setProfile,
+    setOnboardingSubmitted,
+    onboardingSubmitted,
+    profile,
+  ]);
 
   useEffect(() => {
     if (nextRoute && isAnimComplete) {
@@ -227,9 +247,59 @@ const SplashScreen = () => {
       useNativeDriver: true,
     }).start();
 
-    const totalDuration = POWERED_DELAY + 400 + 1800;
-    const timer = setTimeout(() => setIsAnimComplete(true), totalDuration);
-    return () => clearTimeout(timer);
+      // Rider text appears
+      Animated.parallel([
+        Animated.timing(riderOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(riderTranslateY, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]),
+
+      // Tagline appears
+      Animated.parallel([
+        Animated.timing(taglineOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(taglineTranslateY, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
+
+      // Hold for a moment
+      Animated.delay(1500),
+
+      // Fade out all elements
+      Animated.parallel([
+        Animated.timing(logoOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(riderOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(taglineOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(() => {
+      setIsAnimComplete(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ─── RENDER ─────────────────────────────────────────────────────────────────
