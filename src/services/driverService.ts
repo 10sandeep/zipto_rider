@@ -376,6 +376,12 @@ export interface DriverNotificationData {
   read: boolean;
 }
 
+export const registerFcmToken = async (token: string): Promise<void> => {
+  try {
+    await apiClient.put(ENDPOINTS.REGISTER_FCM_TOKEN, { token });
+  } catch {/* non-critical — FCM still works without server-side token */}
+};
+
 export const getNotifications = async (): Promise<DriverNotificationData[]> => {
   try {
     const response = await apiClient.get<{success: boolean; data: DriverNotificationData[]}>(

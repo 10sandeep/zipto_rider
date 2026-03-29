@@ -58,9 +58,10 @@ export const ENDPOINTS = {
   BANK_ACCOUNT_PRIMARY: (id: string) => `/driver/bank-accounts/${id}/primary`, // PUT
 
   // Notifications
-  GET_NOTIFICATIONS: '/notification',         // GET  - get driver notifications
+  GET_NOTIFICATIONS: '/notification',              // GET  - get driver notifications
   MARK_NOTIFICATIONS_READ: '/notification/read-all', // POST - mark all as read
-  CLEAR_NOTIFICATIONS: '/notification/clear', // DELETE - clear all notifications
+  CLEAR_NOTIFICATIONS: '/notification/clear',      // DELETE - clear all notifications
+  REGISTER_FCM_TOKEN: '/notification/fcm-token',   // PUT  - register device FCM token
 
   // Earnings & Withdrawals
   DRIVER_EARNINGS: '/driver/earnings',                       // GET  ?period=today|week|month
