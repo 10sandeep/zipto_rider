@@ -138,6 +138,14 @@ const SplashScreen = () => {
   const [nextRoute,      setNextRoute]      = useState<string | null>(null);
   const [isAnimComplete, setIsAnimComplete] = useState(false);
 
+  const backgroundOpacity = useRef(new Animated.Value(0)).current;
+  const poweredOpacity    = useRef(new Animated.Value(0)).current;
+  const logoOpacity       = useRef(new Animated.Value(1)).current;
+  const riderOpacity      = useRef(new Animated.Value(0)).current;
+  const riderTranslateY   = useRef(new Animated.Value(20)).current;
+  const taglineOpacity    = useRef(new Animated.Value(0)).current;
+  const taglineTranslateY = useRef(new Animated.Value(20)).current;
+
   useEffect(() => {
     if (!isHydrated) {
       return;
@@ -247,6 +255,7 @@ const SplashScreen = () => {
       useNativeDriver: true,
     }).start();
 
+    Animated.sequence([
       // Rider text appears
       Animated.parallel([
         Animated.timing(riderOpacity, {

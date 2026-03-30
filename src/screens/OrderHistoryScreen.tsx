@@ -761,14 +761,11 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: moderateScale(12),
     fontWeight: '600',
-<<<<<<< HEAD
     fontFamily: 'Poppins-Regular',
     color: '#50C878',
   },
   statusTextCancelled: {
     color: '#EF4444',
-=======
->>>>>>> d200cb0cb172572589a2961e7eb1443f5ea5e773
   },
   orderRoute: {
     marginBottom: verticalScale(10),
@@ -802,12 +799,9 @@ const styles = StyleSheet.create({
   routeText: {
     flex: 1,
     fontSize: moderateScale(13),
-<<<<<<< HEAD
     fontFamily: 'Poppins-Regular',
     color: '#666',
-=======
     color: '#475569',
->>>>>>> d200cb0cb172572589a2961e7eb1443f5ea5e773
   },
   chipRow: {
     flexDirection: 'row',
