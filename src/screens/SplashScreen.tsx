@@ -137,6 +137,8 @@ const SplashScreen = () => {
 
   const [nextRoute,      setNextRoute]      = useState<string | null>(null);
   const [isAnimComplete, setIsAnimComplete] = useState(false);
+  const backgroundOpacity = useRef(new Animated.Value(0)).current;
+  const poweredOpacity    = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!isHydrated) {
@@ -247,58 +249,9 @@ const SplashScreen = () => {
       useNativeDriver: true,
     }).start();
 
-      // Rider text appears
-      Animated.parallel([
-        Animated.timing(riderOpacity, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(riderTranslateY, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]),
-
-      // Tagline appears
-      Animated.parallel([
-        Animated.timing(taglineOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(taglineTranslateY, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
-
-      // Hold for a moment
-      Animated.delay(1500),
-
-      // Fade out all elements
-      Animated.parallel([
-        Animated.timing(logoOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(riderOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(taglineOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start(() => {
+    setTimeout(() => {
       setIsAnimComplete(true);
-    });
+    }, POWERED_DELAY + 400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

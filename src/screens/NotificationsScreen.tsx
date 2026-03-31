@@ -186,9 +186,9 @@ export default function NotificationsScreen({navigation}: any) {
           setBookings(prev => [item, ...prev]);
           return;
         }
-        const errorMsg = await acceptBooking(item.bookingId, vehicles[0].id);
-        if (errorMsg !== null) {
-          Alert.alert('Could Not Accept', errorMsg);
+        const result = await acceptBooking(item.bookingId, vehicles[0].id);
+        if (typeof result === 'string') {
+          Alert.alert('Could Not Accept', result);
           setBookings(prev => [item, ...prev]);
         } else {
           Alert.alert('Accepted!', 'Head to the pickup location.');
@@ -394,7 +394,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
-<<<<<<< HEAD
   backIcon: { 
     fontSize: moderateScale(28), 
     color: '#1C1C1E' 
@@ -403,28 +402,21 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(18), 
     fontWeight: '700', 
     fontFamily: 'Poppins-Regular',
-=======
-  headerTitle: {
-    fontSize: moderateScale(18),
-    fontWeight: '700',
->>>>>>> d200cb0cb172572589a2961e7eb1443f5ea5e773
     color: '#1C1C1E',
     flex: 1,
     textAlign: 'center',
     marginHorizontal: scale(10),
   },
-<<<<<<< HEAD
   clearText: { 
     fontSize: moderateScale(14), 
     fontWeight: '600', 
     fontFamily: 'Poppins-Regular',
     color: '#FF6B35' 
-=======
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
->>>>>>> d200cb0cb172572589a2961e7eb1443f5ea5e773
   },
   scrollContent: {
     padding: scale(16),
@@ -597,7 +589,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: scale(12),
   },
-<<<<<<< HEAD
   notifTitle: { 
     fontSize: moderateScale(16), 
     fontWeight: '700', 
@@ -617,25 +608,8 @@ const styles = StyleSheet.create({
     color: '#666', 
     fontFamily: 'Poppins-Regular',
     lineHeight: moderateScale(20) 
-=======
+  },
   notifBody: {flex: 1},
-  notifTitle: {
-    fontSize: moderateScale(14),
-    fontWeight: '700',
-    color: '#1C1C1E',
-    marginBottom: verticalScale(2),
-  },
-  notifMessage: {
-    fontSize: moderateScale(13),
-    color: '#6B7280',
-    lineHeight: moderateScale(18),
-  },
-  notifTime: {
-    fontSize: moderateScale(11),
-    color: '#9CA3AF',
-    marginTop: verticalScale(4),
->>>>>>> d200cb0cb172572589a2961e7eb1443f5ea5e773
-  },
   unreadDot: {
     width: moderateScale(8),
     height: moderateScale(8),

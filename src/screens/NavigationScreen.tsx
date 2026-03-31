@@ -840,19 +840,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
   },
-<<<<<<< HEAD
-  mapText: {
-    fontSize: moderateScale(isSmallDevice ? 40 : 48),
-    fontFamily: 'Poppins-Regular',
-  },
-  mapSubtext: {
-    fontSize: moderateScale(14), 
-    color: '#666', 
-    fontFamily: 'Poppins-Regular',
-    marginTop: verticalScale(8)
-  },
-  bottomSheet: {
-=======
   navigateBtn: {
     position: 'absolute',
     bottom: verticalScale(16),
@@ -874,7 +861,6 @@ const styles = StyleSheet.create({
 
   // Bottom sheet
   sheet: {
->>>>>>> d200cb0cb172572589a2961e7eb1443f5ea5e773
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: moderateScale(24),
     borderTopRightRadius: moderateScale(24),
@@ -893,19 +879,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     alignSelf: 'center',
     marginTop: verticalScale(12),
-<<<<<<< HEAD
-    marginBottom: verticalScale(20),
-  },
-  statusCard: {
-    marginBottom: verticalScale(20)
-  },
-  stepLabel: {
-    fontSize: moderateScale(18),
-    fontWeight: '700',
-    fontFamily: 'Poppins-Regular',
-    color: '#1C1C1E',
-=======
->>>>>>> d200cb0cb172572589a2961e7eb1443f5ea5e773
     marginBottom: verticalScale(16),
   },
 
@@ -916,26 +889,9 @@ const styles = StyleSheet.create({
     width: moderateScale(24),
     height: moderateScale(24),
     borderRadius: moderateScale(12),
-<<<<<<< HEAD
-  },
-  etaItem: {
-    flex: 1, 
-    alignItems: 'center'
-  },
-  etaDivider: {
-    width: 1, 
-    backgroundColor: '#E0E0E0'
-  },
-  etaValue: {
-    fontSize: moderateScale(isSmallDevice ? 20 : 24),
-    fontWeight: '800',
-    fontFamily: 'Poppins-Regular',
-    color: '#007AFF',
-=======
     backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
->>>>>>> d200cb0cb172572589a2961e7eb1443f5ea5e773
     marginBottom: verticalScale(4),
   },
   stepDotActive: {backgroundColor: '#3B82F6'},
@@ -1013,13 +969,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
-<<<<<<< HEAD
-  completeButtonText: {
-    color: '#FFFFFF', 
-    fontSize: moderateScale(16), 
-    fontWeight: '700',
-    fontFamily: 'Poppins-Regular',
-=======
   actionBtnGreen: {backgroundColor: '#16A34A', shadowColor: '#16A34A'},
   actionBtnDisabled: {backgroundColor: '#9CA3AF', elevation: 0, shadowOpacity: 0},
   actionBtnText: {fontSize: moderateScale(16), fontWeight: '700', color: '#FFFFFF'},
@@ -1035,7 +984,6 @@ const styles = StyleSheet.create({
     padding: scale(24),
     paddingBottom: Platform.OS === 'ios' ? verticalScale(44) : verticalScale(24),
     maxHeight: SCREEN_HEIGHT * 0.88,
->>>>>>> d200cb0cb172572589a2961e7eb1443f5ea5e773
   },
   modalHeader: {marginBottom: verticalScale(20)},
   modalTitle: {fontSize: moderateScale(20), fontWeight: '800', color: '#1C1C1E', marginBottom: verticalScale(4)},
