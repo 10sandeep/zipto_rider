@@ -7,9 +7,28 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:275843577396:android:b391c0c2697516d9833c61",
+        "mobilesdk_app_id": "1:275843577396:android:27e1696e8643348f833c61",
         "android_client_info": {
           "package_name": "com.skidorider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbGaEgPvblaFZIsGJhYKPYgG7NjzdPUuA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:275843577396:android:b391c0c2697516d9833c61",
+        "android_client_info": {
+          "package_name": "com.zipto"
         }
       },
       "oauth_client": [],

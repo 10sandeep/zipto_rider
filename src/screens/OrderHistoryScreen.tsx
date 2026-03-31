@@ -801,6 +801,7 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(13),
     fontFamily: 'Poppins-Regular',
     color: '#666',
+    color: '#475569',
   },
   chipRow: {
     flexDirection: 'row',
