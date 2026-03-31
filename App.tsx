@@ -1,4 +1,5 @@
 import React, {useEffect} from 'react';
+import {Alert} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import AppNavigation from './src/navigation/AppNavigation';
 import './src/i18n'; // Init i18n
@@ -35,11 +36,14 @@ function FcmInitializer() {
         await registerFcmToken(token);
       }
 
-      // Listen for foreground messages — show in-app notification or refresh inbox
-      foregroundUnsub = onForegroundMessage(_message => {
-        // The notification is already stored in Redis by the backend.
-        // A real app might show a toast or badge here.
-        // The NotificationsScreen will refresh automatically via socket.
+      // Listen for foreground messages — show in-app notification
+      foregroundUnsub = onForegroundMessage(message => {
+        const title = message?.notification?.title || message?.data?.title || 'New Notification';
+        const body = message?.notification?.body || message?.data?.body || 'You have a new message.';
+        
+        if (message?.notification || message?.data) {
+          Alert.alert(title, body);
+        }
       });
 
       // Listen for token refresh

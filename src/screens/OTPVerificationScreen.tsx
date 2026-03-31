@@ -33,8 +33,25 @@ const moderateScale = (size: number, factor = 0.5) =>
 
 const isSmallDevice = SCREEN_WIDTH < 375;
 
-// Compute a box size that always fits all OTP digits on screen
-const OTP_BOX_SIZE = Math.floor((SCREEN_WIDTH - scale(60) - (OTP_LENGTH - 1) * scale(10)) / OTP_LENGTH);
+const OTP_BOX_SIZE = Math.floor(
+  (SCREEN_WIDTH - scale(64) - (OTP_LENGTH - 1) * scale(12)) / OTP_LENGTH,
+);
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const COLORS = {
+  primary: '#1A56DB',
+  primaryLight: '#EBF2FF',
+  primaryMid: '#BFDBFE',
+  accent: '#0EA5E9',
+  dark: '#0F172A',
+  medium: '#475569',
+  muted: '#94A3B8',
+  border: '#E2E8F0',
+  surface: '#F8FAFC',
+  white: '#FFFFFF',
+  success: '#10B981',
+  danger: '#EF4444',
+};
 
 export default function OTPVerificationScreen({navigation, route}: any) {
   const {phoneNumber, flow} = route.params as {
@@ -44,6 +61,7 @@ export default function OTPVerificationScreen({navigation, route}: any) {
 
   const initialOtp = Array(OTP_LENGTH).fill('');
   const [otp, setOtp] = useState<string[]>(initialOtp);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(OTP_RESEND_COOLDOWN_SECONDS);
@@ -83,16 +101,12 @@ export default function OTPVerificationScreen({navigation, route}: any) {
             profile?.email?.trim() &&
             profile?.address?.trim(),
         );
-      } catch {
-        // profile fetch failed — continue with defaults
-      }
+      } catch {}
 
       try {
         const vehicles = await getMyVehicles();
         hasVehicle = Array.isArray(vehicles) && vehicles.length > 0;
-      } catch {
-        // vehicle fetch failed — continue with defaults
-      }
+      } catch {}
 
       navigation.replace(
         hasRequiredProfileData && hasVehicle
@@ -107,10 +121,7 @@ export default function OTPVerificationScreen({navigation, route}: any) {
   const startResendTimer = useCallback(() => {
     setCanResend(false);
     setResendCooldown(OTP_RESEND_COOLDOWN_SECONDS);
-
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
+    if (timerRef.current) clearInterval(timerRef.current);
 
     timerRef.current = setInterval(() => {
       setResendCooldown(prev => {
@@ -128,23 +139,17 @@ export default function OTPVerificationScreen({navigation, route}: any) {
   useEffect(() => {
     startResendTimer();
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [startResendTimer]);
 
   // ─── OTP input handlers ──────────────────────────────────────────────────
   const handleOtpChange = (value: string, index: number) => {
     if (isNaN(Number(value))) return;
-
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
-
-    if (value && index < OTP_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
-    }
+    if (value && index < OTP_LENGTH - 1) inputRefs.current[index + 1]?.focus();
   };
 
   const handleKeyPress = (e: any, index: number) => {
@@ -154,6 +159,7 @@ export default function OTPVerificationScreen({navigation, route}: any) {
   };
 
   const isOtpComplete = otp.every(digit => digit !== '');
+  const filledCount = otp.filter(d => d !== '').length;
 
   // ─── Verify OTP ──────────────────────────────────────────────────────────
   const handleVerifyOTP = async () => {
@@ -163,21 +169,11 @@ export default function OTPVerificationScreen({navigation, route}: any) {
     setIsVerifying(true);
     try {
       const response = await verifyOTP(phoneNumber, otpCode, 'driver');
-
-      // Build a safe user — API returns user with snake_case fields
-      const safeUser = response.user ?? {
-        id: '',
-        phone: phoneNumber,
-        role: 'driver',
-      };
-
-      // Persist token and user in store (API uses access_token / refresh_token)
+      const safeUser = response.user ?? {id: '', phone: phoneNumber, role: 'driver'};
       setAuth(response.access_token, safeUser, response.refresh_token);
-
       try {
         await resolvePostOtpRoute(flow);
       } catch {
-        // Safe fallback: start onboarding when route resolution fails.
         navigation.replace('KYCVehicleRegistration');
       }
     } catch (error) {
@@ -193,19 +189,14 @@ export default function OTPVerificationScreen({navigation, route}: any) {
   // ─── Resend OTP ──────────────────────────────────────────────────────────
   const handleResendOTP = async () => {
     if (!canResend || isResending) return;
-
     setIsResending(true);
     try {
-      if (flow === 'register') {
-        await sendRegisterOTP(phoneNumber);
-      } else {
-        await sendLoginOTP(phoneNumber);
-      }
-
+      if (flow === 'register') await sendRegisterOTP(phoneNumber);
+      else await sendLoginOTP(phoneNumber);
       setOtp(Array(OTP_LENGTH).fill(''));
       setTimeout(() => inputRefs.current[0]?.focus(), 100);
       startResendTimer();
-      Alert.alert('OTP Sent', `A new OTP has been sent to ${phoneNumber}.`);
+      Alert.alert('OTP Sent', `A new code has been sent to ${phoneNumber}.`);
     } catch (error) {
       const message = getApiErrorMessage(error);
       Alert.alert('Resend Failed', message, [{text: 'OK'}]);
@@ -214,12 +205,31 @@ export default function OTPVerificationScreen({navigation, route}: any) {
     }
   };
 
+  // ─── Progress dots ───────────────────────────────────────────────────────
+  const renderProgressDots = () => (
+    <View style={styles.progressRow}>
+      {Array(OTP_LENGTH)
+        .fill(0)
+        .map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.progressDot,
+              i < filledCount
+                ? styles.progressDotFilled
+                : styles.progressDotEmpty,
+            ]}
+          />
+        ))}
+    </View>
+  );
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -232,71 +242,103 @@ export default function OTPVerificationScreen({navigation, route}: any) {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
-            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-            <Ionicons name="arrow-back" size={moderateScale(24)} color="#3B82F6" />
+            hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
+            <Ionicons name="arrow-back" size={moderateScale(20)} color={COLORS.primary} />
           </TouchableOpacity>
         )}
 
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.iconCircle}>
-            <MaterialCommunityIcons
-              name="message-text-outline"
-              size={moderateScale(isSmallDevice ? 40 : 46)}
-              color="#3B82F6"
-            />
+          {/* Icon badge */}
+          <View style={styles.iconBadge}>
+            <View style={styles.iconRing}>
+              <MaterialCommunityIcons
+                name="shield-check-outline"
+                size={moderateScale(isSmallDevice ? 32 : 36)}
+                color={COLORS.primary}
+              />
+            </View>
           </View>
-          <Text style={styles.titleText}>Enter OTP</Text>
+
+          {/* Label pill */}
+          <View style={styles.labelPill}>
+            <View style={styles.labelDot} />
+            <Text style={styles.labelText}>
+              {flow === 'register' ? 'Account Verification' : 'Login Verification'}
+            </Text>
+          </View>
+
+          <Text style={styles.titleText}>Verify your{'\n'}phone number</Text>
           <Text style={styles.subtitleText}>
-            We've sent a {OTP_LENGTH}-digit code to
+            Enter the {OTP_LENGTH}-digit code sent to
           </Text>
           <Text style={styles.phoneText}>{phoneNumber}</Text>
         </View>
 
-        {/* ── OTP Input Boxes ── */}
-        <View style={styles.otpContainer}>
-          {otp.map((digit, index) => (
-            <TextInput
-              key={index}
-              ref={ref => (inputRefs.current[index] = ref)}
-              style={[
-                styles.otpInput,
-                digit ? styles.otpInputFilled : styles.otpInputEmpty,
-                isVerifying && styles.otpInputDisabled,
-              ]}
-              value={digit}
-              onChangeText={value => handleOtpChange(value, index)}
-              onKeyPress={e => handleKeyPress(e, index)}
-              keyboardType="number-pad"
-              maxLength={1}
-              selectTextOnFocus
-              editable={!isVerifying}
-            />
-          ))}
+        {/* Divider */}
+        <View style={styles.divider} />
+
+        {/* OTP Input Boxes */}
+        <View style={styles.otpSection}>
+          <Text style={styles.otpLabel}>Enter verification code</Text>
+          <View style={styles.otpContainer}>
+            {otp.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={ref => (inputRefs.current[index] = ref)}
+                style={[
+                  styles.otpInput,
+                  focusedIndex === index && styles.otpInputFocused,
+                  digit ? styles.otpInputFilled : styles.otpInputEmpty,
+                  isVerifying && styles.otpInputDisabled,
+                ]}
+                value={digit}
+                onChangeText={value => handleOtpChange(value, index)}
+                onKeyPress={e => handleKeyPress(e, index)}
+                onFocus={() => setFocusedIndex(index)}
+                onBlur={() => setFocusedIndex(null)}
+                keyboardType="number-pad"
+                maxLength={1}
+                selectTextOnFocus
+                editable={!isVerifying}
+              />
+            ))}
+          </View>
+
+          {/* Progress indicator */}
+          {renderProgressDots()}
         </View>
 
         {/* Resend OTP */}
-        <View style={styles.resendContainer}>
+        <View style={styles.resendCard}>
           {canResend ? (
-            <>
-              <Text style={styles.resendText}>Didn't receive the code? </Text>
+            <View style={styles.resendRow}>
+              <Text style={styles.resendText}>Didn't receive the code?</Text>
               <TouchableOpacity
                 onPress={handleResendOTP}
                 disabled={isResending}
                 hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
                 activeOpacity={0.7}>
                 {isResending ? (
-                  <ActivityIndicator color="#3B82F6" size="small" style={styles.resendLoader} />
+                  <ActivityIndicator color={COLORS.primary} size="small" />
                 ) : (
-                  <Text style={styles.resendButton}>Resend OTP</Text>
+                  <Text style={styles.resendButton}>Resend code</Text>
                 )}
               </TouchableOpacity>
-            </>
+            </View>
           ) : (
-            <Text style={styles.resendCooldownText}>
-              Resend OTP in{' '}
-              <Text style={styles.resendCooldownTimer}>{resendCooldown}s</Text>
-            </Text>
+            <View style={styles.resendRow}>
+              <MaterialCommunityIcons
+                name="clock-outline"
+                size={moderateScale(14)}
+                color={COLORS.muted}
+                style={{marginRight: scale(5)}}
+              />
+              <Text style={styles.resendCooldownText}>
+                Resend available in{' '}
+                <Text style={styles.resendCooldownTimer}>{resendCooldown}s</Text>
+              </Text>
+            </View>
           )}
         </View>
 
@@ -308,11 +350,18 @@ export default function OTPVerificationScreen({navigation, route}: any) {
           ]}
           onPress={handleVerifyOTP}
           disabled={!isOtpComplete || isVerifying}
-          activeOpacity={0.8}>
+          activeOpacity={0.85}>
           {isVerifying ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
+            <ActivityIndicator color={COLORS.white} size="small" />
           ) : (
-            <Text style={styles.verifyButtonText}>Verify & Continue</Text>
+            <View style={styles.verifyButtonInner}>
+              <Text style={styles.verifyButtonText}>Verify & Continue</Text>
+              <Ionicons
+                name="arrow-forward"
+                size={moderateScale(18)}
+                color={COLORS.white}
+              />
+            </View>
           )}
         </TouchableOpacity>
 
@@ -321,6 +370,12 @@ export default function OTPVerificationScreen({navigation, route}: any) {
           style={styles.changeNumberButton}
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}>
+          <Ionicons
+            name="pencil-outline"
+            size={moderateScale(13)}
+            color={COLORS.muted}
+            style={{marginRight: scale(4)}}
+          />
           <Text style={styles.changeNumberText}>Change phone number</Text>
         </TouchableOpacity>
 
@@ -332,173 +387,249 @@ export default function OTPVerificationScreen({navigation, route}: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: scale(30),
-    paddingTop: Platform.OS === 'ios' ? verticalScale(50) : verticalScale(40),
-    paddingBottom: verticalScale(30),
+    paddingHorizontal: scale(28),
+    paddingTop: Platform.OS === 'ios' ? verticalScale(56) : verticalScale(44),
+    paddingBottom: verticalScale(36),
   },
+
+  // ── Back Button ───────────────────────────────────────────────────────────
   backButton: {
-    width: moderateScale(44),
-    height: moderateScale(44),
-    borderRadius: moderateScale(22),
-    backgroundColor: '#EFF6FF',
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(12),
+    backgroundColor: COLORS.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    marginBottom: verticalScale(30),
-    shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: verticalScale(28),
+    borderWidth: 1,
+    borderColor: COLORS.primaryMid,
   },
 
   // ── Header ────────────────────────────────────────────────────────────────
   header: {
-    alignItems: 'center',
-    marginBottom: verticalScale(36),  // tightened from 50
+    alignItems: 'flex-start',
+    marginBottom: verticalScale(24),
   },
-  iconCircle: {
-    width: moderateScale(90),         // slightly smaller from 100
-    height: moderateScale(90),
-    borderRadius: moderateScale(45),
-    backgroundColor: '#EFF6FF',
+  iconBadge: {
+    marginBottom: verticalScale(20),
+  },
+  iconRing: {
+    width: moderateScale(72),
+    height: moderateScale(72),
+    borderRadius: moderateScale(20),
+    backgroundColor: COLORS.primaryLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.primaryMid,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: verticalScale(20),
-    shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 3,
+  },
+  labelPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: moderateScale(20),
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(5),
+    marginBottom: verticalScale(14),
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: COLORS.primaryMid,
+  },
+  labelDot: {
+    width: moderateScale(6),
+    height: moderateScale(6),
+    borderRadius: moderateScale(3),
+    backgroundColor: COLORS.primary,
+    marginRight: scale(6),
+  },
+  labelText: {
+    fontSize: moderateScale(11),
+    fontWeight: '600',
+    color: COLORS.primary,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   titleText: {
     fontSize: moderateScale(isSmallDevice ? 26 : 30),
     fontWeight: '800',
-    color: '#1C1C1E',
+    color: COLORS.dark,
+    lineHeight: moderateScale(isSmallDevice ? 34 : 38),
+    letterSpacing: -0.5,
     marginBottom: verticalScale(10),
   },
   subtitleText: {
-    fontSize: moderateScale(15),
-    color: '#8E8E93',
-    fontWeight: '500',
-    marginBottom: verticalScale(4),
-    textAlign: 'center',
+    fontSize: moderateScale(14),
+    color: COLORS.medium,
+    fontWeight: '400',
+    marginBottom: verticalScale(3),
   },
   phoneText: {
-    fontSize: moderateScale(16),
-    color: '#1C1C1E',
+    fontSize: moderateScale(15),
+    color: COLORS.dark,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
 
-  // ── OTP Boxes (key fix) ───────────────────────────────────────────────────
+  // ── Divider ───────────────────────────────────────────────────────────────
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginBottom: verticalScale(28),
+  },
+
+  // ── OTP Section ───────────────────────────────────────────────────────────
+  otpSection: {
+    marginBottom: verticalScale(20),
+  },
+  otpLabel: {
+    fontSize: moderateScale(12),
+    fontWeight: '600',
+    color: COLORS.medium,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: verticalScale(14),
+  },
   otpContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    gap: scale(10),
-    marginBottom: verticalScale(28),
+    gap: scale(12),
+    marginBottom: verticalScale(16),
   },
   otpInput: {
     width: OTP_BOX_SIZE,
-    height: OTP_BOX_SIZE,            // square boxes
-    borderRadius: moderateScale(12),
+    height: OTP_BOX_SIZE,
+    borderRadius: moderateScale(14),
     fontSize: moderateScale(22),
     fontWeight: '700',
-    color: '#1C1C1E',
+    color: COLORS.dark,
     textAlign: 'center',
-    // Clear visible border — this was the main visibility problem
-    borderWidth: 2,
-    borderColor: '#D1D5DB',          // visible grey border by default
-    backgroundColor: '#F9FAFB',
-    // Subtle shadow to lift boxes off white background
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
   },
   otpInputEmpty: {
-    borderColor: '#D1D5DB',          // grey when empty
-    backgroundColor: '#F9FAFB',
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  otpInputFocused: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryLight,
   },
   otpInputFilled: {
-    borderColor: '#3B82F6',          // blue when digit entered
-    backgroundColor: '#EFF6FF',
-    color: '#2563EB',
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryLight,
+    color: COLORS.primary,
   },
   otpInputDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
 
-  // ── Resend ────────────────────────────────────────────────────────────────
-  resendContainer: {
+  // ── Progress dots ─────────────────────────────────────────────────────────
+  progressRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    gap: scale(6),
     alignItems: 'center',
-    marginBottom: verticalScale(32),
-    gap: scale(4),
+  },
+  progressDot: {
+    height: moderateScale(4),
+    borderRadius: moderateScale(2),
+  },
+  progressDotFilled: {
+    width: moderateScale(20),
+    backgroundColor: COLORS.primary,
+  },
+  progressDotEmpty: {
+    width: moderateScale(8),
+    backgroundColor: COLORS.border,
+  },
+
+  // ── Resend Card ───────────────────────────────────────────────────────────
+  resendCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: moderateScale(12),
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: scale(16),
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: verticalScale(28),
+  },
+  resendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scale(6),
     flexWrap: 'wrap',
-    minHeight: verticalScale(22),
   },
   resendText: {
-    fontSize: moderateScale(14),
-    color: '#8E8E93',
+    fontSize: moderateScale(13),
+    color: COLORS.medium,
+    fontWeight: '400',
   },
   resendButton: {
-    fontSize: moderateScale(14),
-    color: '#3B82F6',
+    fontSize: moderateScale(13),
+    color: COLORS.primary,
     fontWeight: '700',
-  },
-  resendLoader: {
-    marginLeft: scale(4),
+    textDecorationLine: 'underline',
+    textDecorationColor: COLORS.primary,
   },
   resendCooldownText: {
-    fontSize: moderateScale(14),
-    color: '#8E8E93',
+    fontSize: moderateScale(13),
+    color: COLORS.muted,
+    fontWeight: '400',
   },
   resendCooldownTimer: {
-    color: '#3B82F6',
+    color: COLORS.primary,
     fontWeight: '700',
   },
 
   // ── Verify Button ─────────────────────────────────────────────────────────
   verifyButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: verticalScale(13),   // reduced from 18
-    borderRadius: moderateScale(12),       // reduced from 15
+    backgroundColor: COLORS.primary,
+    paddingVertical: verticalScale(15),
+    borderRadius: moderateScale(14),
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: verticalScale(46),          // reduced from 54
-    shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 3},
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
-    marginBottom: verticalScale(14),
+    minHeight: verticalScale(52),
+    shadowColor: COLORS.primary,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
+    marginBottom: verticalScale(16),
   },
   verifyButtonDisabled: {
-    backgroundColor: '#93C5FD',
+    backgroundColor: COLORS.primaryMid,
     shadowOpacity: 0,
     elevation: 0,
   },
+  verifyButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
+  },
   verifyButtonText: {
-    color: '#FFFFFF',
-    fontSize: moderateScale(15),           // reduced from 18
+    color: COLORS.white,
+    fontSize: moderateScale(15),
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
 
   // ── Change Number ─────────────────────────────────────────────────────────
   changeNumberButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: verticalScale(10),
   },
   changeNumberText: {
-    fontSize: moderateScale(14),
-    color: '#8E8E93',
+    fontSize: moderateScale(13),
+    color: COLORS.muted,
     fontWeight: '500',
   },
 });
