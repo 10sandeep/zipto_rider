@@ -23,7 +23,6 @@ const scaleW = (size: number) => (SCREEN_WIDTH  / BASE_WIDTH)  * size;
 const scaleH = (size: number) => (SCREEN_HEIGHT / BASE_HEIGHT) * size;
 const ms     = (size: number, factor = 0.45) => size + (scaleW(size) - size) * factor;
 const fs     = (size: number) => Math.round(PixelRatio.roundToNearestPixel(ms(size)));
-// ──────────────────────────────────────────────────────────────────────────────
 
 // ─── Routing helpers ───────────────────────────────────────────────────────────
 const getErrorStatusCode = (error: unknown): number | undefined => {
@@ -49,22 +48,29 @@ const hasOnboardingData = async (): Promise<boolean> => {
     return false;
   }
 };
-// ──────────────────────────────────────────────────────────────────────────────
 
+// ─── Animation constants ───────────────────────────────────────────────────────
 const STAGGER_MS = 100;
 
 const ZIPTO_LETTERS      = ['Z', 'i', 'p', 't', 'o'];
 const RIDER_LETTERS      = ['R', 'i', 'd', 'e', 'r'];
 const ONBOARDING_LETTERS = ['O', 'n', 'b', 'o', 'a', 'r', 'd', 'i', 'n', 'g'];
 
-// ── Stagger timeline ───────────────────────────────────────────────────────────
-// Zipto pops first, then Rider+Onboarding animate as one tight block
 const ZIPTO_START      = 0;
 const RIDER_START      = ZIPTO_LETTERS.length * STAGGER_MS + 280;
-const ONBOARDING_START = RIDER_START + RIDER_LETTERS.length * STAGGER_MS + 80; // tight 80ms gap
+const ONBOARDING_START = RIDER_START + RIDER_LETTERS.length * STAGGER_MS + 80;
 const POWERED_DELAY    = ONBOARDING_START + ONBOARDING_LETTERS.length * STAGGER_MS + 380;
 
-// ── Single letter with Zomato-style pop animation ─────────────────────────────
+const HOLD_AFTER_LETTERS = 2500;
+const FADE_OUT_DURATION  = 800;
+const NAV_BUFFER         = 400;
+
+// ── This is the TOTAL time the splash must stay on screen before navigating ──
+// Animation starts → letters pop → hold → fade → buffer → navigate
+const MIN_SPLASH_MS =
+  POWERED_DELAY + HOLD_AFTER_LETTERS + FADE_OUT_DURATION + NAV_BUFFER;
+
+// ─── Single letter with pop animation ─────────────────────────────────────────
 const LetterPop = ({
   char,
   delay,
@@ -121,7 +127,7 @@ const LetterPop = ({
   );
 };
 
-// ── Splash screen ──────────────────────────────────────────────────────────────
+// ─── Splash screen ─────────────────────────────────────────────────────────────
 const SplashScreen = () => {
   const navigation = useNavigation<any>();
   const {
@@ -135,93 +141,103 @@ const SplashScreen = () => {
     setOnboardingSubmitted,
   } = useAuthStore();
 
-  const [nextRoute,      setNextRoute]      = useState<string | null>(null);
-  const [isAnimComplete, setIsAnimComplete] = useState(false);
+  // Store resolved route and whether animation sequence is fully done
+  const nextRouteRef      = useRef<string | null>(null);
+  const animDoneRef       = useRef(false);
+  const splashStartTime   = useRef(Date.now());
+
+  // Track state for re-render trigger only
+  const [routeReady, setRouteReady] = useState(false);
+  const [animReady,  setAnimReady]  = useState(false);
+
   const backgroundOpacity = useRef(new Animated.Value(0)).current;
   const poweredOpacity    = useRef(new Animated.Value(0)).current;
-  const logoOpacity       = useRef(new Animated.Value(1)).current;
-  const riderOpacity      = useRef(new Animated.Value(0)).current;
-  const riderTranslateY   = useRef(new Animated.Value(20)).current;
-  const taglineOpacity    = useRef(new Animated.Value(0)).current;
-  const taglineTranslateY = useRef(new Animated.Value(20)).current;
+  const contentOpacity    = useRef(new Animated.Value(1)).current;
 
+  // ─── Attempt navigation — only fires when BOTH are ready ─────────────────────
+  const tryNavigate = (routeOverride?: string) => {
+    const route = routeOverride ?? nextRouteRef.current;
+    if (!route) return;
+    if (!animDoneRef.current) return;
+
+    // Enforce minimum splash duration from mount time
+    const elapsed   = Date.now() - splashStartTime.current;
+    const remaining = Math.max(0, MIN_SPLASH_MS - elapsed);
+
+    setTimeout(() => {
+      navigation.replace(route);
+    }, remaining);
+  };
+
+  // ─── Route resolution ─────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
+    if (!isHydrated) return;
 
-    const hasJwt = Boolean(token);
-    if (!isAuthenticated && !hasJwt) {
-      const dest = hasSeenOnboarding ? 'Welcome' : 'Onboarding';
-      setNextRoute(dest);
-      return;
-    }
+    const resolveRoute = async () => {
+      const hasJwt = Boolean(token);
 
-    const checkStatus = async () => {
+      if (!isAuthenticated && !hasJwt) {
+        const dest = hasSeenOnboarding ? 'Welcome' : 'Onboarding';
+        nextRouteRef.current = dest;
+        setRouteReady(true);
+        return;
+      }
+
       const cachedProfile = useAuthStore.getState().profile ?? profile;
-      let isResolved = false;
 
-      const timeoutFallback = setTimeout(() => {
-        if (!isResolved) {
+      // Fallback if API hangs
+      const timeoutId = setTimeout(() => {
+        if (!nextRouteRef.current) {
           if (cachedProfile?.verification_status === 'APPROVED') {
-            setNextRoute('MainTabs');
+            nextRouteRef.current = 'MainTabs';
           } else if (cachedProfile?.verification_status) {
-            setNextRoute('KYCStatus');
+            nextRouteRef.current = 'KYCStatus';
           } else {
-            setNextRoute('KYCVehicleRegistration');
+            nextRouteRef.current = 'KYCVehicleRegistration';
           }
+          setRouteReady(true);
         }
       }, 3000);
 
       try {
         const status = await getVerificationStatus();
-        isResolved = true;
-        clearTimeout(timeoutFallback);
+        clearTimeout(timeoutId);
 
         if (status.verification_status === 'APPROVED') {
-          // Pre-fetch profile if approved
           getDriverProfile()
             .then(p => setProfile(p))
             .catch(() => {});
-
-          setNextRoute('MainTabs');
+          nextRouteRef.current = 'MainTabs';
         } else {
           if (onboardingSubmitted) {
-            setNextRoute('KYCStatus');
-            return;
+            nextRouteRef.current = 'KYCStatus';
+          } else {
+            const completed = await hasOnboardingData();
+            if (completed) setOnboardingSubmitted(true);
+            nextRouteRef.current = completed ? 'KYCStatus' : 'KYCVehicleRegistration';
           }
-          const completed = await hasOnboardingData();
-          if (completed) setOnboardingSubmitted(true);
-          setNextRoute(completed ? 'KYCStatus' : 'KYCVehicleRegistration');
         }
       } catch (error) {
-        isResolved = true;
-        clearTimeout(timeoutFallback);
+        clearTimeout(timeoutId);
         const statusCode = getErrorStatusCode(error);
 
         if (statusCode === 404) {
-          setNextRoute('KYCVehicleRegistration');
-          return;
-        }
-
-        // 401 means both access and refresh tokens are expired -> force re-login.
-        if (statusCode === 401) {
-          setNextRoute('Welcome');
-          return;
-        }
-
-        // Fallback to cached profile if offline or other error
-        if (cachedProfile?.verification_status === 'APPROVED') {
-          setNextRoute('MainTabs');
+          nextRouteRef.current = 'KYCVehicleRegistration';
+        } else if (statusCode === 401) {
+          nextRouteRef.current = 'Welcome';
+        } else if (cachedProfile?.verification_status === 'APPROVED') {
+          nextRouteRef.current = 'MainTabs';
         } else if (cachedProfile?.verification_status) {
-          setNextRoute('KYCStatus');
+          nextRouteRef.current = 'KYCStatus';
         } else {
-          setNextRoute('KYCVehicleRegistration');
+          nextRouteRef.current = 'KYCVehicleRegistration';
         }
       }
+
+      setRouteReady(true);
     };
 
-    checkStatus();
+    resolveRoute();
   }, [
     isHydrated,
     isAuthenticated,
@@ -233,91 +249,68 @@ const SplashScreen = () => {
     profile,
   ]);
 
+  // ─── Try navigate whenever route becomes ready ────────────────────────────────
   useEffect(() => {
-    if (nextRoute && isAnimComplete) {
-      navigation.replace(nextRoute);
-    }
-  }, [nextRoute, isAnimComplete]);
+    if (routeReady) tryNavigate();
+  }, [routeReady]);
 
-  // ─── ANIMATION ──────────────────────────────────────────────────────────────
+  // ─── Try navigate whenever animation becomes ready ────────────────────────────
   useEffect(() => {
+    if (animReady) tryNavigate();
+  }, [animReady]);
+
+  // ─── Animation sequence ───────────────────────────────────────────────────────
+  useEffect(() => {
+    // Background fade in
     Animated.timing(backgroundOpacity, {
       toValue: 1,
-      duration: 300,
+      duration: 400,
       useNativeDriver: true,
     }).start();
 
+    // "Powered by" fade in
     Animated.timing(poweredOpacity, {
       toValue: 1,
-      duration: 400,
+      duration: 500,
       delay: POWERED_DELAY,
       useNativeDriver: true,
     }).start();
 
-    Animated.sequence([
-      // Rider text appears
+    // After hold period → fade everything out
+    const fadeOutTimer = setTimeout(() => {
       Animated.parallel([
-        Animated.timing(riderOpacity, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(riderTranslateY, {
+        Animated.timing(contentOpacity, {
           toValue: 0,
-          duration: 500,
+          duration: FADE_OUT_DURATION,
           useNativeDriver: true,
         }),
-      ]),
+        Animated.timing(poweredOpacity, {
+          toValue: 0,
+          duration: FADE_OUT_DURATION,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backgroundOpacity, {
+          toValue: 0,
+          duration: FADE_OUT_DURATION,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setTimeout(() => {
+          animDoneRef.current = true;
+          setAnimReady(true); // triggers tryNavigate via useEffect
+        }, NAV_BUFFER);
+      });
+    }, POWERED_DELAY + HOLD_AFTER_LETTERS);
 
-      // Tagline appears
-      Animated.parallel([
-        Animated.timing(taglineOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(taglineTranslateY, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
-
-      // Hold for a moment
-      Animated.delay(1500),
-
-      // Fade out all elements
-      Animated.parallel([
-        Animated.timing(logoOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(riderOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(taglineOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start(() => {
-      setTimeout(() => {
-        setIsAnimComplete(true);
-      }, POWERED_DELAY + 400);
-    });
+    return () => clearTimeout(fadeOutTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── RENDER ─────────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* ── Solid royal-blue background ── */}
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
@@ -325,10 +318,7 @@ const SplashScreen = () => {
         ]}
       />
 
-      {/* ── Centre content ── */}
-      <View style={styles.content}>
-
-        {/* ── "Zipto" — hero brand word ── */}
+      <Animated.View style={[styles.content, { opacity: contentOpacity }]}>
         <View style={styles.lettersRow}>
           {ZIPTO_LETTERS.map((char, index) => (
             <LetterPop
@@ -340,10 +330,7 @@ const SplashScreen = () => {
           ))}
         </View>
 
-        {/* ── Subtitle block — "Rider" + "Onboarding" tight together ── */}
         <View style={styles.subtitleBlock}>
-
-          {/* "Rider" */}
           <View style={styles.lettersRow}>
             {RIDER_LETTERS.map((char, index) => (
               <LetterPop
@@ -355,7 +342,6 @@ const SplashScreen = () => {
             ))}
           </View>
 
-          {/* "Onboarding" — zero gap, same line-height */}
           <View style={styles.lettersRow}>
             {ONBOARDING_LETTERS.map((char, index) => (
               <LetterPop
@@ -366,11 +352,9 @@ const SplashScreen = () => {
               />
             ))}
           </View>
-
         </View>
-      </View>
+      </Animated.View>
 
-      {/* ── Bottom branding ── */}
       <Animated.Text style={[styles.poweredBy, { opacity: poweredOpacity }]}>
         Powered by Zipto Technologies
       </Animated.Text>
@@ -386,27 +370,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   lettersRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // "Rider Onboarding" block — sits snug below Zipto
   subtitleBlock: {
     alignItems: 'center',
-    marginTop: scaleH(6),   // tight gap below "Zipto"
-    gap: 0,                 // RN 0.71+ — no extra space between the two rows
+    marginTop: scaleH(6),
+    gap: 0,
   },
-
-  // "Zipto" — large Cocon hero
   letterLarge: {
     fontSize:      fs(68),
     fontWeight:    'normal',
@@ -415,17 +393,14 @@ const styles = StyleSheet.create({
     letterSpacing: ms(1.5),
     lineHeight:    fs(72),
   },
-
-  // "Rider" + "Onboarding" — compact, bold, tight line-height
   letterSub: {
     fontSize:      fs(26),
     fontWeight:    'normal',
     color:         '#FFFFFF',
     fontFamily:    'Poppins-Bold',
     letterSpacing: ms(0.8),
-    lineHeight:    fs(30),  // keeps the two rows flush with no breathing room
+    lineHeight:    fs(30),
   },
-
   poweredBy: {
     fontSize:      fs(12),
     color:         'rgba(255,255,255,0.35)',

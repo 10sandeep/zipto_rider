@@ -33,6 +33,13 @@ import BankDetailsScreen from '../screens/BankDetailsScreen';
 import RatingsReviewsScreen from '../screens/RatingsReviewsScreen';
 import AttendanceScreen from '../screens/AttendanceScreen';
 
+// Import Policy Screens
+import PrivacyPolicyScreen from '../screens/PrivacyPolicy';
+import ConductScreen from '../screens/ConductScreen';
+import CancellationPolicyScreen from '../screens/CancellationScreen';
+import PaymentsScreen from '../screens/PaymentPolicy';
+import TermsConditionScreen from '../screens/TermsCondition';
+import AboutUsScreen from '../screens/AboutUs';
 // Type definitions for Stack Navigator
 export type RootStackParamList = {
   // Auth & Onboarding
@@ -64,11 +71,22 @@ export type RootStackParamList = {
   BankDetails: undefined;
   RatingsReviews: undefined;
   Attendance: undefined;
+
+  // Policies
+  PrivacyPolicy: undefined;
+  ConductPolicy: undefined;
+  CancellationPolicy: undefined;
+  PaymentPolicy: undefined;
+  TermsCondition: undefined;
+  AboutUs: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-const screenOptions = {headerShown: false, animation: 'slide_from_right' as const};
+const screenOptions = {
+  headerShown: false,
+  animation: 'slide_from_right' as const,
+};
 
 // Main App Navigation
 export default function AppNavigation() {
@@ -96,9 +114,18 @@ export default function AppNavigation() {
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
-            <Stack.Screen name="KYCVehicleRegistration" component={KYCVehicleRegistrationScreen} />
-            <Stack.Screen name="DocumentUpload" component={DocumentUploadScreen} />
+            <Stack.Screen
+              name="OTPVerification"
+              component={OTPVerificationScreen}
+            />
+            <Stack.Screen
+              name="KYCVehicleRegistration"
+              component={KYCVehicleRegistrationScreen}
+            />
+            <Stack.Screen
+              name="DocumentUpload"
+              component={DocumentUploadScreen}
+            />
             <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
             <Stack.Screen name="KYCStatus" component={KYCStatusScreen} />
           </>
@@ -108,20 +135,60 @@ export default function AppNavigation() {
           <>
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="MainTabs" component={TabNavigator} />
+
             {/* KYC screens needed for newly registered drivers who are authenticated but haven't completed KYC */}
-            <Stack.Screen name="KYCVehicleRegistration" component={KYCVehicleRegistrationScreen} />
-            <Stack.Screen name="DocumentUpload" component={DocumentUploadScreen} />
+            <Stack.Screen
+              name="KYCVehicleRegistration"
+              component={KYCVehicleRegistrationScreen}
+            />
+            <Stack.Screen
+              name="DocumentUpload"
+              component={DocumentUploadScreen}
+            />
             <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
             <Stack.Screen name="KYCStatus" component={KYCStatusScreen} />
+
+            {/* Orders */}
             <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
             <Stack.Screen name="Navigation" component={NavigationScreen} />
+
+            {/* Profile & Settings */}
             <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen
+              name="Notifications"
+              component={NotificationsScreen}
+            />
             <Stack.Screen name="Support" component={SupportScreen} />
-            <Stack.Screen name="VehicleDetails" component={VehicleDetailsScreen} />
+            <Stack.Screen
+              name="VehicleDetails"
+              component={VehicleDetailsScreen}
+            />
             <Stack.Screen name="BankDetails" component={BankDetailsScreen} />
-            <Stack.Screen name="RatingsReviews" component={RatingsReviewsScreen} />
+            <Stack.Screen
+              name="RatingsReviews"
+              component={RatingsReviewsScreen}
+            />
             <Stack.Screen name="Attendance" component={AttendanceScreen} />
+
+            {/* Policies */}
+            <Stack.Screen
+              name="PrivacyPolicy"
+              component={PrivacyPolicyScreen}
+            />
+            <Stack.Screen name="ConductPolicy" component={ConductScreen} />
+            <Stack.Screen
+              name="CancellationPolicy"
+              component={CancellationPolicyScreen}
+            />
+            <Stack.Screen name="PaymentPolicy" component={PaymentsScreen} />
+            <Stack.Screen
+              name="TermsCondition"
+              component={TermsConditionScreen}
+            />
+              <Stack.Screen
+              name="AboutUs"
+              component={AboutUsScreen}
+            />
           </>
         )}
       </Stack.Navigator>
@@ -144,6 +211,7 @@ export default function AppNavigation() {
  *    MainTabs (Home, Orders, Earnings, Profile)
  *    ├── From Home → OrderDetails → Navigation
  *    ├── From Profile → Settings, VehicleDetails, BankDetails, etc.
+ *    ├── From Profile → PrivacyPolicy, ConductPolicy, CancellationPolicy, PaymentPolicy
  *    └── Global Access → Notifications, Support
  *
  * ==================== NOTES ====================

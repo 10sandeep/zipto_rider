@@ -52,13 +52,34 @@ import {rejectBooking} from '../services/driverService';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
-// Responsive scaling functions
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
-const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
-
-// Responsive helpers
+const moderateScale = (size: number, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
 const isSmallDevice = SCREEN_WIDTH < 375;
+
+// ─── Palette (matches Zipto theme) ───────────────────────────────────────────
+const C = {
+  bg: '#F4F6FB',
+  surface: '#FFFFFF',
+  primary: '#1A56DB',
+  primaryLight: '#EBF0FF',
+  primaryMid: '#BFCFFF',
+  headerBg: '#0F2D6B',
+  text: '#0F172A',
+  textSub: '#64748B',
+  textMuted: '#94A3B8',
+  border: '#E2E8F0',
+  danger: '#EF4444',
+  dangerLight: '#FEF2F2',
+  white: '#FFFFFF',
+  green: '#10B981',
+  greenLight: '#D1FAE5',
+  greenDark: '#065F46',
+  amber: '#F59E0B',
+  amberLight: '#FEF3C7',
+  amberDark: '#92400E',
+};
 
 // ─── Swipe-to-Accept Slider ───────────────────────────────────────────────────
 const THUMB_SIZE = moderateScale(56);
@@ -120,21 +141,20 @@ const SwipeToAccept = ({
       <Animated.View
         style={[styles.sliderThumb, {transform: [{translateX}]}]}
         {...panResponder.panHandlers}>
-        <Ionicons name="chevron-forward" size={moderateScale(26)} color="#FFFFFF" />
+        <Ionicons name="chevron-forward" size={moderateScale(26)} color={C.white} />
       </Animated.View>
     </View>
   );
 };
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function HomeScreen({navigation}: any) {
   const [isOnline, setIsOnline] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [hasApprovedVehicle, setHasApprovedVehicle] = useState<boolean | null>(null);
 
-  // Real-Time Booking State
-  const [incomingBooking, setIncomingBooking] = useState<BookingOffer | null>(
-    null,
-  );
+  const [incomingBooking, setIncomingBooking] = useState<BookingOffer | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -154,28 +174,17 @@ export default function HomeScreen({navigation}: any) {
 
   const handleAcceptBooking = async () => {
     if (!incomingBooking) return;
-
-    // Optimistic: dismiss immediately so driver sees instant feedback
     const bookingSnapshot = incomingBooking;
     dismissOffer();
     setIsAccepting(true);
-
     try {
       const vehicles = await getMyVehicles();
       if (!vehicles || vehicles.length === 0) {
-        Alert.alert(
-          'No Vehicle',
-          'No registered vehicle found. Please add a vehicle first.',
-        );
+        Alert.alert('No Vehicle', 'No registered vehicle found. Please add a vehicle first.');
         return;
       }
-
       const primaryVehicleId = vehicles[0].id;
-      const result = await acceptBooking(
-        bookingSnapshot.bookingId,
-        primaryVehicleId,
-      );
-
+      const result = await acceptBooking(bookingSnapshot.bookingId, primaryVehicleId);
       if (typeof result !== 'string') {
         fetchStats();
         navigation.navigate('Navigation', {bookingId: result.realBookingId});
@@ -193,16 +202,8 @@ export default function HomeScreen({navigation}: any) {
     if (!incomingBooking) return;
     const bookingId = incomingBooking.bookingId;
     dismissOffer();
-    // Fire-and-forget: tell backend to move to next driver immediately
     rejectBooking(bookingId);
   }, [incomingBooking, dismissOffer]);
-
-  const initialRegion = {
-    latitude: 13.0827,
-    longitude: 80.2707,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  };
 
   const {profile, setProfile, user} = useAuthStore();
   const [hasUnread, setHasUnread] = useState(false);
@@ -230,8 +231,6 @@ export default function HomeScreen({navigation}: any) {
 
   const handleToggleOnline = async (value: boolean) => {
     if (isToggling) return;
-
-    // Block going online if no approved vehicle
     if (value && !hasApprovedVehicle) {
       Alert.alert(
         'Vehicle Not Verified',
@@ -240,21 +239,16 @@ export default function HomeScreen({navigation}: any) {
       );
       return;
     }
-
     setIsToggling(true);
-    // Optimistic UI update
     setIsOnline(value);
-
     try {
       const status = value ? 'online' : 'offline';
       const success = await updateAvailability({availability_status: status});
       if (!success) {
-        // Revert on failure
         setIsOnline(!value);
         Alert.alert('Error', 'Failed to update availability status.');
       }
     } catch {
-      // Revert on failure
       setIsOnline(!value);
       Alert.alert('Error', 'Failed to update availability status.');
     } finally {
@@ -280,7 +274,6 @@ export default function HomeScreen({navigation}: any) {
       .catch(() => {});
   }, [fetchProfile, fetchStats]);
 
-  // Countdown timer — starts fresh on each new offer, auto-dismisses at 0
   useEffect(() => {
     if (!incomingBooking) {
       clearCountdown();
@@ -293,7 +286,6 @@ export default function HomeScreen({navigation}: any) {
         if (prev <= 1) {
           clearInterval(countdownRef.current!);
           countdownRef.current = null;
-          // Offer expired on client side — dismiss silently (server handles next driver)
           setIncomingBooking(null);
           return 0;
         }
@@ -306,14 +298,11 @@ export default function HomeScreen({navigation}: any) {
         countdownRef.current = null;
       }
     };
-    // Re-run only when a new offer arrives (bookingId changes)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingBooking?.bookingId]);
 
-  // Background Location Syncer (Only when Online)
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
-
     const requestLocationPermission = async () => {
       if (Platform.OS === 'ios') {
         Geolocation.requestAuthorization();
@@ -324,8 +313,7 @@ export default function HomeScreen({navigation}: any) {
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           {
             title: 'Location Permission',
-            message:
-              'App needs access to your location to update your position.',
+            message: 'App needs access to your location to update your position.',
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
             buttonPositive: 'OK',
@@ -337,15 +325,10 @@ export default function HomeScreen({navigation}: any) {
         return false;
       }
     };
-
     const syncLocation = async () => {
-      if (!isOnline) return; // Do not strictly poll location if offline
-
+      if (!isOnline) return;
       const hasPermission = await requestLocationPermission();
-      if (!hasPermission) {
-        return;
-      }
-
+      if (!hasPermission) return;
       Geolocation.getCurrentPosition(
         async position => {
           const {latitude, longitude} = position.coords;
@@ -357,20 +340,15 @@ export default function HomeScreen({navigation}: any) {
         {enableHighAccuracy: false, timeout: 20000, maximumAge: 10000},
       );
     };
-
     if (isOnline) {
-      // Force an immediate sync when toggled online
       syncLocation();
-      // ST_DWithin Tracking Loop - 15 seconds
       intervalId = setInterval(syncLocation, 15000);
     }
-
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
   }, [isOnline]);
 
-  // Web Socket Lifecycles
   useEffect(() => {
     const setupSocket = () => {
       if (isOnline) {
@@ -384,9 +362,7 @@ export default function HomeScreen({navigation}: any) {
             });
           });
           onOfferExpired(_bookingId => dismissOffer());
-          onNoDriversFound(_bookingId => {
-            // No-op for driver side — server already handles this
-          });
+          onNoDriversFound(_bookingId => {});
         }
       } else {
         offBookingOffer();
@@ -395,17 +371,12 @@ export default function HomeScreen({navigation}: any) {
         disconnectSocket();
       }
     };
-
-    // Initial setup
     setupSocket();
-
-    // Reattach when coming from background back to active
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active' && isOnline) {
         setupSocket();
       }
     });
-
     return () => {
       subscription.remove();
       offBookingOffer();
@@ -425,101 +396,173 @@ export default function HomeScreen({navigation}: any) {
     year: 'numeric',
   });
 
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="light-content" backgroundColor={C.headerBg} />
 
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>Hello, {firstName}! 👋</Text>
-          <Text style={styles.date}>{currentDate}</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={() => navigation.navigate('Notifications')}
-          activeOpacity={0.7}
-          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-          <Ionicons
-            name="notifications-outline"
-            size={moderateScale(24)}
-            color="#3B82F6"
-          />
-          {hasUnread && <View style={styles.badge} />}
-        </TouchableOpacity>
-      </View>
+        <View style={styles.decCircle1} />
+        <View style={styles.decCircle2} />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}>
-        {/* Online Toggle Card */}
+        <View style={styles.headerInner}>
+          {/* Greeting */}
+          <View style={styles.headerLeft}>
+            <Text style={styles.greeting}>Hello, {firstName}! 👋</Text>
+            <Text style={styles.date}>{currentDate}</Text>
+          </View>
+
+          {/* Notification bell */}
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={() => navigation.navigate('Notifications')}
+            activeOpacity={0.7}
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            <Ionicons
+              name="notifications-outline"
+              size={moderateScale(22)}
+              color={C.white}
+            />
+            {hasUnread && <View style={styles.badge} />}
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Online Toggle inside header ─────────────────────────────── */}
         <View style={styles.onlineCard}>
-          <View style={styles.onlineCardLeft}>
-            <Text style={styles.onlineTitle}>Go Online</Text>
-            <Text style={styles.onlineSubtitle}>
-              {isOnline
-                ? 'Accepting orders'
-                : hasApprovedVehicle === false
-                ? 'Vehicle not verified yet'
-                : 'Start accepting orders'}
-            </Text>
+          <View style={styles.onlineLeft}>
+            <View
+              style={[
+                styles.onlineStatusDot,
+                {backgroundColor: isOnline ? C.green : C.textMuted},
+              ]}
+            />
+            <View>
+              <Text style={styles.onlineTitle}>
+                {isOnline ? 'You are Online' : 'You are Offline'}
+              </Text>
+              <Text style={styles.onlineSubtitle}>
+                {isOnline
+                  ? 'Accepting new delivery requests'
+                  : hasApprovedVehicle === false
+                  ? 'Vehicle not verified yet'
+                  : 'Toggle to start accepting orders'}
+              </Text>
+            </View>
           </View>
           <Switch
             value={isOnline}
             onValueChange={handleToggleOnline}
             disabled={isToggling}
-            trackColor={{false: '#E0E0E0', true: '#3B82F6'}}
-            thumbColor="#FFFFFF"
-            style={{transform: [{scaleX: Platform.OS === 'ios' ? 0.9 : 1}, {scaleY: Platform.OS === 'ios' ? 0.9 : 1}]}}
+            trackColor={{false: 'rgba(255,255,255,0.2)', true: C.green}}
+            thumbColor={C.white}
+            style={{
+              transform: [
+                {scaleX: Platform.OS === 'ios' ? 0.9 : 1},
+                {scaleY: Platform.OS === 'ios' ? 0.9 : 1},
+              ],
+            }}
           />
         </View>
+      </View>
+
+      {/* ── Scroll Content ────────────────────────────────────────────── */}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
 
         {/* Vehicle not verified warning */}
         {hasApprovedVehicle === false && (
           <View style={styles.vehicleWarningBanner}>
-            <Ionicons name="warning-outline" size={moderateScale(16)} color="#E65100" />
+            <View style={styles.warningIconWrap}>
+              <Ionicons
+                name="warning-outline"
+                size={moderateScale(18)}
+                color={C.amberDark}
+              />
+            </View>
             <Text style={styles.vehicleWarningText}>
-              Your vehicle is pending verification. You can go online once the admin approves it.
+              Your vehicle is pending verification. You can go online once the
+              admin approves it.
             </Text>
           </View>
         )}
 
-        {/* Stats Container */}
+        {/* ── Stats Row ──────────────────────────────────────────────── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>TODAY'S SUMMARY</Text>
+        </View>
+
         <View style={styles.statsContainer}>
+          {/* Orders */}
           <View style={styles.statCard}>
-            <View style={styles.statIconContainer}>
+            <View style={[styles.statIconWrap, {backgroundColor: C.primaryLight}]}>
               <MaterialCommunityIcons
                 name="package-variant-closed"
-                size={moderateScale(28)}
-                color="#3B82F6"
+                size={moderateScale(22)}
+                color={C.primary}
               />
             </View>
             <Text style={styles.statValue}>{dailyStats.today_orders}</Text>
-            <Text style={styles.statLabel}>Today's Orders</Text>
+            <Text style={styles.statLabel}>Deliveries</Text>
           </View>
+
+          {/* Divider */}
+          <View style={styles.statDivider} />
+
+          {/* Earnings */}
           <View style={styles.statCard}>
-            <View style={styles.statIconContainer}>
-              <Ionicons name="wallet-outline" size={moderateScale(28)} color="#16A34A" />
+            <View style={[styles.statIconWrap, {backgroundColor: C.greenLight}]}>
+              <Ionicons
+                name="wallet-outline"
+                size={moderateScale(22)}
+                color={C.greenDark}
+              />
             </View>
-            <Text style={styles.statValue}>₹{dailyStats.today_earnings}</Text>
-            <Text style={styles.statLabel}>Today's Earnings</Text>
+            <Text style={[styles.statValue, {color: C.green}]}>
+              ₹{dailyStats.today_earnings}
+            </Text>
+            <Text style={styles.statLabel}>Earnings</Text>
           </View>
+        </View>
+
+        {/* ── Idle / Status Card ─────────────────────────────────────── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>STATUS</Text>
+        </View>
+
+        <View style={styles.statusCard}>
+          <View style={[styles.statusIconWrap, {backgroundColor: isOnline ? C.greenLight : C.primaryLight}]}>
+            <Ionicons
+              name={isOnline ? 'radio-outline' : 'moon-outline'}
+              size={moderateScale(26)}
+              color={isOnline ? C.greenDark : C.primary}
+            />
+          </View>
+          <Text style={styles.statusCardTitle}>
+            {isOnline ? 'Waiting for Orders' : 'Currently Offline'}
+          </Text>
+          <Text style={styles.statusCardSub}>
+            {isOnline
+              ? 'Stay connected — new delivery requests will appear here automatically.'
+              : 'Toggle the switch above to go online and start receiving delivery requests.'}
+          </Text>
         </View>
       </ScrollView>
 
-      {/* Incoming Booking Modal */}
+      {/* ── Incoming Booking Modal ────────────────────────────────────── */}
       <Modal visible={!!incomingBooking} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            {/* Progress bar — full width at the very top */}
+            {/* Progress bar */}
             <View style={styles.progressTrack}>
               <View
                 style={[
                   styles.progressFill,
                   {
                     width: `${(countdown / (incomingBooking?.timeLeft || 30)) * 100}%` as any,
-                    backgroundColor: countdown <= 10 ? '#FF3B30' : '#007AFF',
+                    backgroundColor: countdown <= 10 ? C.danger : C.primary,
                   },
                 ]}
               />
@@ -527,15 +570,13 @@ export default function HomeScreen({navigation}: any) {
 
             {incomingBooking && (
               <View style={styles.modalContent}>
-                {/* Header: title + vehicle type | countdown badge */}
+                {/* Header */}
                 <View style={styles.modalHeader}>
                   <View>
                     <Text style={styles.modalTitle}>New Delivery Request!</Text>
                     {incomingBooking.vehicleType && (
                       <Text style={styles.vehicleTypeText}>
-                        {incomingBooking.vehicleType
-                          .replace('_', ' ')
-                          .toUpperCase()}
+                        {incomingBooking.vehicleType.replace('_', ' ').toUpperCase()}
                       </Text>
                     )}
                   </View>
@@ -554,9 +595,8 @@ export default function HomeScreen({navigation}: any) {
                   </View>
                 </View>
 
-                {/* Location details card */}
+                {/* Location card */}
                 <View style={styles.detailsCard}>
-                  {/* Pickup row */}
                   <View style={styles.modalRow}>
                     <View>
                       <View style={styles.dotPickup} />
@@ -569,7 +609,6 @@ export default function HomeScreen({navigation}: any) {
                       </Text>
                     </View>
                   </View>
-                  {/* Dropoff row */}
                   <View style={styles.modalRow}>
                     <View style={styles.dotDropoff} />
                     <View style={styles.locationTextContainer}>
@@ -581,11 +620,11 @@ export default function HomeScreen({navigation}: any) {
                   </View>
                 </View>
 
-                {/* Stats: distance | earnings */}
+                {/* Stats row */}
                 <View style={styles.statsRow}>
                   <View style={styles.statBox}>
                     <Text style={styles.modalLabel}>Distance</Text>
-                    <Text style={styles.statValue}>
+                    <Text style={styles.modalStatValue}>
                       {incomingBooking.distance} km
                     </Text>
                   </View>
@@ -599,28 +638,43 @@ export default function HomeScreen({navigation}: any) {
                 </View>
 
                 {/* Paid by badge */}
-                <View style={[
-                  styles.paidByOfferBadge,
-                  incomingBooking.paid_by === 'receiver'
-                    ? {backgroundColor: '#EDE9FE'}
-                    : {backgroundColor: '#E0F2FE'},
-                ]}>
-                  <Ionicons
-                    name={incomingBooking.paid_by === 'receiver' ? 'person-outline' : 'person'}
-                    size={moderateScale(14)}
-                    color={incomingBooking.paid_by === 'receiver' ? '#7C3AED' : '#0369A1'}
-                  />
-                  <Text style={[
-                    styles.paidByOfferText,
-                    {color: incomingBooking.paid_by === 'receiver' ? '#7C3AED' : '#0369A1'},
+                <View
+                  style={[
+                    styles.paidByOfferBadge,
+                    incomingBooking.paid_by === 'receiver'
+                      ? {backgroundColor: '#EDE9FE'}
+                      : {backgroundColor: C.primaryLight},
                   ]}>
+                  <Ionicons
+                    name={
+                      incomingBooking.paid_by === 'receiver'
+                        ? 'person-outline'
+                        : 'person'
+                    }
+                    size={moderateScale(14)}
+                    color={
+                      incomingBooking.paid_by === 'receiver'
+                        ? '#7C3AED'
+                        : C.primary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.paidByOfferText,
+                      {
+                        color:
+                          incomingBooking.paid_by === 'receiver'
+                            ? '#7C3AED'
+                            : C.primary,
+                      },
+                    ]}>
                     {incomingBooking.paid_by === 'receiver'
                       ? 'Receiver Pays'
                       : 'Sender Pays'}
                   </Text>
                 </View>
 
-                {/* Actions: circular reject + swipe to accept */}
+                {/* Actions */}
                 <View style={styles.modalActions}>
                   <TouchableOpacity
                     style={styles.rejectButton}
@@ -629,8 +683,8 @@ export default function HomeScreen({navigation}: any) {
                     activeOpacity={0.7}>
                     <Ionicons
                       name="close"
-                      size={moderateScale(28)}
-                      color="#FF3B30"
+                      size={moderateScale(26)}
+                      color={C.danger}
                     />
                   </TouchableOpacity>
                   <View style={styles.sliderWrapper}>
@@ -649,342 +703,286 @@ export default function HomeScreen({navigation}: any) {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: C.bg,
   },
+
+  // ── Header ────────────────────────────────────────────────────────────────
   header: {
+    backgroundColor: C.headerBg,
+    paddingTop: Platform.OS === 'ios' ? verticalScale(56) : verticalScale(44),
+    paddingHorizontal: scale(20),
+    paddingBottom: verticalScale(24),
+    overflow: 'hidden',
+    borderBottomLeftRadius: moderateScale(32),
+    borderBottomRightRadius: moderateScale(32),
+  },
+  decCircle1: {
+    position: 'absolute',
+    width: scale(220),
+    height: scale(220),
+    borderRadius: scale(110),
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    top: -scale(70),
+    right: -scale(50),
+  },
+  decCircle2: {
+    position: 'absolute',
+    width: scale(150),
+    height: scale(150),
+    borderRadius: scale(75),
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    bottom: -scale(40),
+    left: -scale(30),
+  },
+  headerInner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: scale(20),
-    paddingTop: Platform.OS === 'ios' ? verticalScale(50) : verticalScale(40),
-    paddingBottom: verticalScale(20),
-    backgroundColor: '#FFFFFF',
-    zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
+    alignItems: 'flex-start',
+    marginBottom: verticalScale(20),
   },
   headerLeft: {
     flex: 1,
+    paddingRight: scale(12),
   },
   greeting: {
     fontSize: moderateScale(isSmallDevice ? 20 : 24),
     fontWeight: '800',
-    color: '#1C1C1E',
+    color: C.white,
+    letterSpacing: -0.3,
   },
   date: {
-    fontSize: moderateScale(14),
-    color: '#8E8E93',
+    fontSize: moderateScale(12),
+    color: 'rgba(255,255,255,0.55)',
     marginTop: verticalScale(4),
+    fontWeight: '500',
   },
   notificationButton: {
-    width: moderateScale(48),
-    height: moderateScale(48),
-    borderRadius: moderateScale(24),
-    backgroundColor: '#EFF6FF',
+    width: moderateScale(42),
+    height: moderateScale(42),
+    borderRadius: moderateScale(21),
+    backgroundColor: 'rgba(255,255,255,0.12)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   badge: {
     position: 'absolute',
-    top: scale(10),
-    right: scale(10),
-    width: moderateScale(10),
-    height: moderateScale(10),
+    top: scale(8),
+    right: scale(8),
+    width: moderateScale(9),
+    height: moderateScale(9),
     borderRadius: moderateScale(5),
-    backgroundColor: '#EF4444',
+    backgroundColor: C.danger,
+    borderWidth: 1.5,
+    borderColor: C.headerBg,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: scale(20),
-    paddingBottom: verticalScale(100),
-  },
+
+  // ── Online Card (inside header) ───────────────────────────────────────────
   onlineCard: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: scale(20),
+    backgroundColor: 'rgba(255,255,255,0.10)',
     borderRadius: moderateScale(16),
-    marginTop: verticalScale(20),
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-    minHeight: verticalScale(80),
+    paddingHorizontal: scale(16),
+    paddingVertical: verticalScale(14),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
-  onlineCardLeft: {
-    flex: 1,
-    paddingRight: scale(12),
-  },
-  onlineTitle: {
-    fontSize: moderateScale(18),
-    fontWeight: '700',
-    fontFamily: 'Poppins-Regular',
-    color: '#1C1C1E',
-    marginBottom: verticalScale(4),
-  },
-  onlineSubtitle: {
-    fontSize: moderateScale(14),
-    fontFamily: 'Poppins-Regular',
-    color: '#8E8E93',
-  },
-  vehicleWarningBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFF3E0',
-    borderRadius: moderateScale(10),
-    padding: scale(12),
-    marginTop: verticalScale(8),
-    gap: scale(8),
-    borderLeftWidth: 3,
-    borderLeftColor: '#E65100',
-  },
-  vehicleWarningText: {
-    flex: 1,
-    fontSize: moderateScale(13),
-    color: '#E65100',
-    lineHeight: moderateScale(18),
-  },
-  currentOrderCard: {
-    backgroundColor: '#FFFFFF',
-    padding: scale(20),
-    borderRadius: moderateScale(16),
-    marginTop: verticalScale(16),
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-    shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: verticalScale(16),
-  },
-  orderHeaderLeft: {
+  onlineLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(8),
+    gap: scale(12),
     flex: 1,
     paddingRight: scale(8),
   },
-  currentOrderTitle: {
-    fontSize: moderateScale(18),
+  onlineStatusDot: {
+    width: moderateScale(10),
+    height: moderateScale(10),
+    borderRadius: moderateScale(5),
+    flexShrink: 0,
+  },
+  onlineTitle: {
+    fontSize: moderateScale(15),
     fontWeight: '700',
-    fontFamily: 'Poppins-Regular',
-    color: '#3B82F6',
+    color: C.white,
+    letterSpacing: -0.1,
   },
-  amountBadge: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: scale(12),
-    paddingVertical: verticalScale(6),
-    borderRadius: moderateScale(8),
+  onlineSubtitle: {
+    fontSize: moderateScale(11.5),
+    color: 'rgba(255,255,255,0.55)',
+    marginTop: verticalScale(2),
+    fontWeight: '400',
   },
-  amountText: {
-    fontSize: moderateScale(16),
+
+  // ── Scroll content ────────────────────────────────────────────────────────
+  scrollContent: {
+    paddingBottom: verticalScale(110),
+  },
+
+  // ── Section header ────────────────────────────────────────────────────────
+  sectionHeader: {
+    paddingHorizontal: scale(24),
+    paddingTop: verticalScale(24),
+    paddingBottom: verticalScale(8),
+  },
+  sectionTitle: {
+    fontSize: moderateScale(11),
     fontWeight: '700',
-    fontFamily: 'Poppins-Regular',
-    color: '#3B82F6',
+    color: C.textMuted,
+    letterSpacing: 1.4,
   },
-  orderInfo: {
-    marginBottom: verticalScale(16),
-  },
-  orderRow: {
+
+  // ── Vehicle warning ───────────────────────────────────────────────────────
+  vehicleWarningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: scale(12),
-    marginBottom: verticalScale(16),
-  },
-  orderTextContainer: {
-    flex: 1,
-  },
-  orderLabel: {
-    fontSize: moderateScale(12),
-    color: '#8E8E93',
-    marginBottom: verticalScale(4),
-    textTransform: 'uppercase',
-    fontWeight: '600',
-    fontFamily: 'Poppins-Regular',
-  },
-  orderValue: {
-    fontSize: moderateScale(14),
-    fontWeight: '600',
-    fontFamily: 'Poppins-Regular',
-    color: '#1C1C1E',
-    lineHeight: moderateScale(20),
-  },
-  dashedLine: {
-    height: 1,
+    backgroundColor: C.amberLight,
+    borderRadius: moderateScale(14),
+    padding: scale(14),
+    marginHorizontal: scale(20),
+    marginTop: verticalScale(16),
+    gap: scale(10),
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
-    marginVertical: verticalScale(8),
-    marginLeft: scale(32),
+    borderColor: '#FDE68A',
   },
-  distanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scale(8),
-    marginTop: verticalScale(8),
-  },
-  distanceText: {
-    fontSize: moderateScale(14),
-    color: '#8E8E93',
-    fontWeight: '600',
-    fontFamily: 'Poppins-Regular',
-  },
-  viewDetailsButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: verticalScale(14),
-    borderRadius: moderateScale(12),
-    alignItems: 'center',
-    flexDirection: 'row',
+  warningIconWrap: {
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(8),
+    backgroundColor: '#FEF3C7',
     justifyContent: 'center',
-    gap: scale(8),
-    minHeight: verticalScale(50),
-    shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    alignItems: 'center',
+    flexShrink: 0,
   },
-  viewDetailsText: {
-    color: '#FFFFFF',
-    fontSize: moderateScale(16),
-    fontWeight: '700',
-    fontFamily: 'Poppins-Regular',
+  vehicleWarningText: {
+    flex: 1,
+    fontSize: moderateScale(12.5),
+    color: C.amberDark,
+    lineHeight: moderateScale(18),
+    fontWeight: '500',
   },
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
   statsContainer: {
     flexDirection: 'row',
-    gap: scale(12),
-    marginTop: verticalScale(16),
+    marginHorizontal: scale(20),
+    backgroundColor: C.surface,
+    borderRadius: moderateScale(16),
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: '#0F172A',
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+    overflow: 'hidden',
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    padding: scale(20),
-    borderRadius: moderateScale(16),
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
     alignItems: 'center',
-    minHeight: verticalScale(120),
+    paddingVertical: verticalScale(20),
+    paddingHorizontal: scale(8),
   },
-  statIconContainer: {
-    marginBottom: verticalScale(8),
+  statDivider: {
+    width: 1,
+    backgroundColor: C.border,
+    marginVertical: verticalScale(16),
+  },
+  statIconWrap: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: verticalScale(10),
   },
   statValue: {
-    fontSize: moderateScale(isSmallDevice ? 20 : 24),
+    fontSize: moderateScale(isSmallDevice ? 22 : 26),
     fontWeight: '800',
-    fontFamily: 'Poppins-Regular',
-    color: '#1C1C1E',
-    marginBottom: verticalScale(4),
+    color: C.text,
+    marginBottom: verticalScale(2),
+    letterSpacing: -0.5,
   },
   statLabel: {
-    fontSize: moderateScale(13),
-    color: '#8E8E93',
+    fontSize: moderateScale(11.5),
+    color: C.textMuted,
+    fontWeight: '500',
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
-  // Map Marker Styles
-  markerContainer: {
+
+  // ── Status idle card ──────────────────────────────────────────────────────
+  statusCard: {
+    backgroundColor: C.surface,
+    marginHorizontal: scale(20),
+    borderRadius: moderateScale(16),
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: '#0F172A',
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
     alignItems: 'center',
+    paddingVertical: verticalScale(28),
+    paddingHorizontal: scale(24),
   },
-  pickupMarker: {
-    width: moderateScale(40),
-    height: moderateScale(40),
+  statusIconWrap: {
+    width: moderateScale(64),
+    height: moderateScale(64),
     borderRadius: moderateScale(20),
-    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    marginBottom: verticalScale(14),
   },
-  deliveryMarker: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
-    backgroundColor: '#16A34A',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  markerCallout: {
-    backgroundColor: '#FFFFFF',
-    padding: scale(12),
-    borderRadius: moderateScale(12),
-    marginTop: verticalScale(8),
-    minWidth: scale(150),
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  markerText: {
-    fontSize: moderateScale(12),
+  statusCardTitle: {
+    fontSize: moderateScale(17),
     fontWeight: '700',
-    fontFamily: 'Poppins-Regular',
-    color: '#3B82F6',
-    marginBottom: verticalScale(4),
+    color: C.text,
+    marginBottom: verticalScale(8),
+    letterSpacing: -0.2,
   },
-  markerAddress: {
-    fontSize: moderateScale(11),
-    fontFamily: 'Poppins-Regular',
-    color: '#6B7280',
+  statusCardSub: {
+    fontSize: moderateScale(13),
+    color: C.textMuted,
+    textAlign: 'center',
+    lineHeight: moderateScale(19),
+    fontWeight: '400',
   },
 
-
-  // Modal Styles
+  // ── Modal ─────────────────────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: moderateScale(24),
-    borderTopRightRadius: moderateScale(24),
+    backgroundColor: C.surface,
+    borderTopLeftRadius: moderateScale(28),
+    borderTopRightRadius: moderateScale(28),
     overflow: 'hidden',
-    paddingBottom:
-      Platform.OS === 'ios' ? verticalScale(40) : verticalScale(20),
+    paddingBottom: Platform.OS === 'ios' ? verticalScale(40) : verticalScale(20),
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: -2},
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 10,
+    shadowOffset: {width: 0, height: -4},
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 12,
   },
   progressTrack: {
-    height: verticalScale(6),
-    backgroundColor: '#E5E5EA',
+    height: verticalScale(4),
+    backgroundColor: C.border,
     width: '100%',
   },
   progressFill: {
     height: '100%',
+    borderRadius: 2,
   },
   modalContent: {
     padding: scale(24),
@@ -992,43 +990,49 @@ const styles = StyleSheet.create({
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: verticalScale(20),
+    alignItems: 'flex-start',
+    marginBottom: verticalScale(18),
   },
   modalTitle: {
-    fontSize: moderateScale(22),
+    fontSize: moderateScale(20),
     fontWeight: '800',
-    fontFamily: 'Poppins-Regular',
-    color: '#1C1C1E',
+    color: C.text,
+    letterSpacing: -0.3,
   },
   vehicleTypeText: {
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(12),
     fontWeight: '600',
-    color: '#8E8E93',
-    marginTop: verticalScale(4),
+    color: C.textMuted,
+    marginTop: verticalScale(3),
+    letterSpacing: 0.8,
   },
   countdownBadge: {
-    backgroundColor: '#E5F1FF',
-    paddingHorizontal: scale(16),
-    paddingVertical: verticalScale(8),
+    backgroundColor: C.primaryLight,
+    paddingHorizontal: scale(14),
+    paddingVertical: verticalScale(7),
     borderRadius: moderateScale(20),
+    borderWidth: 1,
+    borderColor: C.primaryMid,
   },
   countdownUrgentBadge: {
-    backgroundColor: '#FFEBEA',
+    backgroundColor: C.dangerLight,
+    borderColor: '#FECACA',
   },
   countdownText: {
-    fontSize: moderateScale(16),
-    fontWeight: '700',
-    color: '#007AFF',
+    fontSize: moderateScale(15),
+    fontWeight: '800',
+    color: C.primary,
   },
   countdownUrgentText: {
-    color: '#FF3B30',
+    color: C.danger,
   },
   detailsCard: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: moderateScale(16),
+    backgroundColor: C.bg,
+    borderRadius: moderateScale(14),
     padding: scale(16),
-    marginBottom: verticalScale(16),
+    marginBottom: verticalScale(14),
+    borderWidth: 1,
+    borderColor: C.border,
   },
   modalRow: {
     flexDirection: 'row',
@@ -1043,64 +1047,73 @@ const styles = StyleSheet.create({
     width: moderateScale(12),
     height: moderateScale(12),
     borderRadius: moderateScale(6),
-    backgroundColor: '#34C759',
+    backgroundColor: C.green,
     marginTop: verticalScale(4),
   },
   dotDropoff: {
     width: moderateScale(12),
     height: moderateScale(12),
-    backgroundColor: '#FF3B30',
+    backgroundColor: C.danger,
     marginTop: verticalScale(4),
   },
   connectingLine: {
     width: 2,
     height: verticalScale(20),
-    backgroundColor: '#D1D1D6',
+    backgroundColor: C.border,
     marginLeft: moderateScale(5),
     marginVertical: verticalScale(4),
   },
   modalLabel: {
-    fontSize: moderateScale(12),
-    fontWeight: '600',
-    color: '#8E8E93',
+    fontSize: moderateScale(11),
+    fontWeight: '700',
+    color: C.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   modalValue: {
-    fontSize: moderateScale(16),
-    fontWeight: '500',
-    color: '#1C1C1E',
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: C.text,
     marginTop: verticalScale(2),
+    lineHeight: moderateScale(20),
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
-    borderRadius: moderateScale(16),
+    backgroundColor: C.bg,
+    borderRadius: moderateScale(14),
     padding: scale(16),
-    marginBottom: verticalScale(24),
+    marginBottom: verticalScale(14),
+    borderWidth: 1,
+    borderColor: C.border,
   },
   statBox: {
     flex: 1,
   },
   verticalDivider: {
     width: 1,
-    height: verticalScale(30),
-    backgroundColor: '#D1D1D6',
+    height: verticalScale(32),
+    backgroundColor: C.border,
     marginHorizontal: scale(16),
   },
   earningsLabel: {
-    fontSize: moderateScale(12),
-    fontWeight: '600',
-    color: '#34C759',
+    fontSize: moderateScale(11),
+    fontWeight: '700',
+    color: C.green,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
+  },
+  modalStatValue: {
+    fontSize: moderateScale(20),
+    fontWeight: '800',
+    color: C.text,
+    marginTop: verticalScale(4),
   },
   modalPrice: {
     fontSize: moderateScale(24),
     fontWeight: '800',
-    color: '#34C759',
+    color: C.green,
     marginTop: verticalScale(4),
   },
   paidByOfferBadge: {
@@ -1109,35 +1122,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: scale(6),
     paddingVertical: verticalScale(8),
-    borderRadius: moderateScale(8),
-    marginBottom: verticalScale(8),
+    borderRadius: moderateScale(10),
+    marginBottom: verticalScale(16),
   },
   paidByOfferText: {
     fontSize: moderateScale(12),
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
   modalActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: scale(12),
   },
   rejectButton: {
-    width: moderateScale(64),
-    height: moderateScale(64),
-    borderRadius: moderateScale(32),
-    backgroundColor: '#F2F2F7',
+    width: moderateScale(60),
+    height: moderateScale(60),
+    borderRadius: moderateScale(30),
+    backgroundColor: C.dangerLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: scale(16),
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
   sliderWrapper: {
     flex: 1,
   },
+
+  // ── Swipe slider ──────────────────────────────────────────────────────────
   sliderContainer: {
-    height: moderateScale(64),
-    backgroundColor: '#E5F1FF',
-    borderRadius: moderateScale(32),
+    height: moderateScale(60),
+    backgroundColor: C.primaryLight,
+    borderRadius: moderateScale(30),
     justifyContent: 'center',
     padding: 4,
+    borderWidth: 1,
+    borderColor: C.primaryMid,
   },
   sliderTrack: {
     ...StyleSheet.absoluteFillObject,
@@ -1145,24 +1165,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sliderText: {
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(13),
     fontWeight: '700',
-    color: '#007AFF',
-    letterSpacing: 1,
-    marginLeft: moderateScale(20),
+    color: C.primary,
+    letterSpacing: 1.2,
+    marginLeft: moderateScale(24),
   },
   sliderThumb: {
     width: moderateScale(THUMB_SIZE),
     height: moderateScale(THUMB_SIZE),
     borderRadius: moderateScale(THUMB_SIZE / 2),
-    backgroundColor: '#007AFF',
+    backgroundColor: C.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowColor: C.primary,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
   },
 });
-
