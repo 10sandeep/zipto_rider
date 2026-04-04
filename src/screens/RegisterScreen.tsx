@@ -47,7 +47,21 @@ export default function RegisterScreen({navigation}: any) {
     const fullPhone = countryCode + trimmedPhone;
     setIsLoading(true);
     try {
-      await sendRegisterOTP(fullPhone);
+      const res = await sendRegisterOTP(fullPhone);
+      if (res.isNewUser === false) {
+        Alert.alert(
+          'Already Registered',
+          'This number is already registered as a driver. Please login instead.',
+          [
+            {text: 'Cancel', style: 'cancel'},
+            {
+              text: 'Login',
+              onPress: () => navigation.navigate('Login'),
+            },
+          ],
+        );
+        return;
+      }
       navigation.navigate('OTPVerification', {
         phoneNumber: fullPhone,
         flow: 'register',

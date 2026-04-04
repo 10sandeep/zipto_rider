@@ -30,10 +30,10 @@ const isSmallDevice = SCREEN_WIDTH < 375;
 const fmt = (n: number) =>
   '₹' + n.toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 2});
 
-type Period = 'today' | 'week' | 'month';
+type Period = 'all' | 'today' | 'week' | 'month';
 
 export default function EarningsScreen({navigation}: any) {
-  const [period, setPeriod] = useState<Period>('today');
+  const [period, setPeriod] = useState<Period>('all');
   const [data, setData] = useState<EarningsDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -139,14 +139,14 @@ export default function EarningsScreen({navigation}: any) {
 
       {/* Period Selector */}
       <View style={styles.periodSelector}>
-        {(['today', 'week', 'month'] as Period[]).map(p => (
+        {(['all', 'today', 'week', 'month'] as Period[]).map(p => (
           <TouchableOpacity
             key={p}
             style={[styles.periodButton, period === p && styles.periodButtonActive]}
             onPress={() => setPeriod(p)}
             activeOpacity={0.7}>
             <Text style={[styles.periodText, period === p && styles.periodTextActive]}>
-              {p.charAt(0).toUpperCase() + p.slice(1)}
+              {p === 'all' ? 'Total' : p.charAt(0).toUpperCase() + p.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -195,7 +195,7 @@ export default function EarningsScreen({navigation}: any) {
           {/* Total Earnings Card */}
           <View style={styles.totalCard}>
             <Text style={styles.totalLabel}>
-              {period === 'today' ? "Today's Earnings" : period === 'week' ? "This Week's Earnings" : "This Month's Earnings"}
+              {period === 'all' ? 'Total Earnings' : period === 'today' ? "Today's Earnings" : period === 'week' ? "This Week's Earnings" : "This Month's Earnings"}
             </Text>
             <Text style={styles.totalValue}>{fmt(data?.total_earnings ?? 0)}</Text>
             <View style={styles.statsRow}>

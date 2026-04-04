@@ -17,14 +17,28 @@ import {
   PanResponder,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import Sound from 'react-native-sound';
+import {playBookingAlertSound, stopBookingAlertSound, releaseBookingAlertSound, pauseBookingAlertSound} from '../services/soundService';
 
-Sound.setCategory('Playback');
-const bookingAlertSound = new Sound('booking_alert.wav', Sound.MAIN_BUNDLE, err => {
-  if (err) {
-    // Sound failed to load — silent fallback
-  }
-});
+const GMAPS_KEY = 'AIzaSyBk3embTThBzPAZBmSlIYue_JFHk2iBe9A';
+
+const reverseGeocodeCoords = async (lat: number, lng: number): Promise<string | null> => {
+  try {
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GMAPS_KEY}&result_type=sublocality%7Clocality&language=en`,
+    );
+    const data = await res.json();
+    if (data.status === 'OK' && data.results?.length > 0) {
+      const comps: Array<{types: string[]; short_name: string}> =
+        data.results[0].address_components || [];
+      const sub = comps.find(
+        c => c.types.includes('sublocality_level_1') || c.types.includes('sublocality'),
+      );
+      const local = comps.find(c => c.types.includes('locality'));
+      return sub?.short_name || local?.short_name || null;
+    }
+  } catch {}
+  return null;
+};
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useAuthStore} from '../store/authStore';
@@ -36,6 +50,7 @@ import {
   getMyVehicles,
   acceptBooking,
   getNotifications,
+  getCalendar,
 } from '../services/driverService';
 import {
   connectSocket,
@@ -148,6 +163,7 @@ export default function HomeScreen({navigation}: any) {
   }, []);
 
   const dismissOffer = useCallback(() => {
+    stopBookingAlertSound();
     clearCountdown();
     setIncomingBooking(null);
   }, [clearCountdown]);
@@ -210,6 +226,11 @@ export default function HomeScreen({navigation}: any) {
     today_earnings: 0,
     today_orders: 0,
   });
+  const [attendanceSummary, setAttendanceSummary] = useState({
+    days_present: 0,
+    total_days: 0,
+  });
+  const [locationName, setLocationName] = useState<string | null>(null);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -278,6 +299,22 @@ export default function HomeScreen({navigation}: any) {
     getNotifications()
       .then(notifs => setHasUnread(notifs.some(n => !n.read)))
       .catch(() => {});
+    const now = new Date();
+    getCalendar('month', now.getFullYear(), now.getMonth() + 1)
+      .then(cal => setAttendanceSummary({
+        days_present: cal.summary.days_present,
+        total_days: cal.summary.total_days,
+      }))
+      .catch(() => {});
+    // Get location name on mount
+    Geolocation.getCurrentPosition(
+      async pos => {
+        const name = await reverseGeocodeCoords(pos.coords.latitude, pos.coords.longitude);
+        if (name) {setLocationName(name);}
+      },
+      () => {},
+      {enableHighAccuracy: false, timeout: 10000, maximumAge: 120000},
+    );
   }, [fetchProfile, fetchStats]);
 
   // Countdown timer — starts fresh on each new offer, auto-dismisses at 0
@@ -358,6 +395,21 @@ export default function HomeScreen({navigation}: any) {
       );
     };
 
+    // Fetch location name once when online (for header display)
+    if (isOnline) {
+      Geolocation.getCurrentPosition(
+        async position => {
+          const name = await reverseGeocodeCoords(
+            position.coords.latitude,
+            position.coords.longitude,
+          );
+          if (name) {setLocationName(name);}
+        },
+        () => {},
+        {enableHighAccuracy: false, timeout: 10000, maximumAge: 60000},
+      );
+    }
+
     if (isOnline) {
       // Force an immediate sync when toggled online
       syncLocation();
@@ -379,9 +431,10 @@ export default function HomeScreen({navigation}: any) {
           connectSocket(activeToken);
           onBookingOffer(offer => {
             setIncomingBooking(offer);
-            bookingAlertSound.stop(() => {
-              bookingAlertSound.play();
-            });
+            // Play booking alert sound safely with error handling
+            playBookingAlertSound().catch(err =>
+              console.warn('[HomeScreen] Failed to play booking sound:', err),
+            );
           });
           onOfferExpired(_bookingId => dismissOffer());
           onNoDriversFound(_bookingId => {
@@ -412,8 +465,16 @@ export default function HomeScreen({navigation}: any) {
       offOfferExpired();
       offNoDriversFound();
       disconnectSocket();
+      pauseBookingAlertSound();
     };
   }, [isOnline, dismissOffer]);
+
+  // Cleanup sound resources on component unmount
+  useEffect(() => {
+    return () => {
+      releaseBookingAlertSound();
+    };
+  }, []);
 
   const displayName = profile?.name || user?.name || 'Partner';
   const firstName = displayName.split(' ')[0];
@@ -434,6 +495,12 @@ export default function HomeScreen({navigation}: any) {
         <View style={styles.headerLeft}>
           <Text style={styles.greeting}>Hello, {firstName}! 👋</Text>
           <Text style={styles.date}>{currentDate}</Text>
+          {locationName ? (
+            <View style={styles.locationRow}>
+              <Ionicons name="location-sharp" size={moderateScale(13)} color="#3B82F6" />
+              <Text style={styles.locationText}>{locationName}</Text>
+            </View>
+          ) : null}
         </View>
         <TouchableOpacity
           style={styles.notificationButton}
@@ -505,6 +572,40 @@ export default function HomeScreen({navigation}: any) {
             <Text style={styles.statValue}>₹{dailyStats.today_earnings}</Text>
             <Text style={styles.statLabel}>Today's Earnings</Text>
           </View>
+        </View>
+
+        {/* Attendance | Rating | Feedback */}
+        <View style={styles.statsContainer}>
+          <TouchableOpacity
+            style={styles.statCardSm}
+            onPress={() => navigation.navigate('Attendance')}
+            activeOpacity={0.7}>
+            <Ionicons name="calendar-outline" size={moderateScale(24)} color="#F59E0B" />
+            <Text style={styles.statValueSm}>
+              {attendanceSummary.days_present}/{attendanceSummary.total_days}
+            </Text>
+            <Text style={styles.statLabelSm}>Attendance</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.statCardSm}
+            onPress={() => navigation.navigate('RatingsReviews')}
+            activeOpacity={0.7}>
+            <Ionicons name="star-outline" size={moderateScale(24)} color="#F59E0B" />
+            <Text style={styles.statValueSm}>
+              {Number(profile?.average_rating ?? 0) > 0
+                ? Number(profile?.average_rating).toFixed(1)
+                : 'New'}
+            </Text>
+            <Text style={styles.statLabelSm}>Rating</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.statCardSm}
+            onPress={() => navigation.navigate('RatingsReviews')}
+            activeOpacity={0.7}>
+            <Ionicons name="chatbubble-outline" size={moderateScale(24)} color="#3B82F6" />
+            <Text style={styles.statValueSm}>{profile?.total_ratings ?? 0}</Text>
+            <Text style={styles.statLabelSm}>Feedback</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -681,6 +782,17 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14),
     color: '#8E8E93',
     marginTop: verticalScale(4),
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: verticalScale(3),
+    gap: scale(3),
+  },
+  locationText: {
+    fontSize: moderateScale(13),
+    color: '#3B82F6',
+    fontWeight: '600',
   },
   notificationButton: {
     width: moderateScale(48),
@@ -896,6 +1008,31 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: moderateScale(13),
+    color: '#8E8E93',
+    textAlign: 'center',
+  },
+  statCardSm: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: verticalScale(14),
+    paddingHorizontal: scale(8),
+    borderRadius: moderateScale(14),
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+    alignItems: 'center',
+    gap: verticalScale(4),
+  },
+  statValueSm: {
+    fontSize: moderateScale(isSmallDevice ? 16 : 18),
+    fontWeight: '800',
+    color: '#1C1C1E',
+    textAlign: 'center',
+  },
+  statLabelSm: {
+    fontSize: moderateScale(11),
     color: '#8E8E93',
     textAlign: 'center',
   },
