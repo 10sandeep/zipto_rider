@@ -40,6 +40,7 @@ import CancellationPolicyScreen from '../screens/CancellationScreen';
 import PaymentsScreen from '../screens/PaymentPolicy';
 import TermsConditionScreen from '../screens/TermsCondition';
 import AboutUsScreen from '../screens/AboutUs';
+
 // Type definitions for Stack Navigator
 export type RootStackParamList = {
   // Auth & Onboarding
@@ -108,10 +109,11 @@ export default function AppNavigation() {
       <Stack.Navigator screenOptions={screenOptions}>
         {!isAuthenticated ? (
           // ── AUTH STACK ─────────────────────────────────────────────
-          // Shown when logged out or JWT expired (clearAuth was called)
+          // Splash handles routing to Onboarding or Welcome based on hasSeenOnboarding
           <>
-            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen
@@ -185,10 +187,7 @@ export default function AppNavigation() {
               name="TermsCondition"
               component={TermsConditionScreen}
             />
-              <Stack.Screen
-              name="AboutUs"
-              component={AboutUsScreen}
-            />
+            <Stack.Screen name="AboutUs" component={AboutUsScreen} />
           </>
         )}
       </Stack.Navigator>
@@ -219,4 +218,7 @@ export default function AppNavigation() {
  * - All other screens are in the main Stack
  * - Authentication flow is separated from main app flow
  * - KYC flow is only for new registrations
+ * - Splash screen handles routing logic:
+ *     Unauthenticated: hasSeenOnboarding → Welcome, else → Onboarding
+ *     Authenticated:   verification_status → MainTabs or KYCStatus or KYCVehicleRegistration
  */

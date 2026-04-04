@@ -212,6 +212,7 @@ export default function HomeScreen({navigation}: any) {
     today_orders: 0,
   });
 
+  // ─── Always start offline on home screen load ─────────────────────────────
   const fetchProfile = useCallback(async () => {
     try {
       const [data, vehicles] = await Promise.all([
@@ -219,9 +220,11 @@ export default function HomeScreen({navigation}: any) {
         getMyVehicles().catch(() => []),
       ]);
       setProfile(data);
-      if (data?.availability_status) {
-        setIsOnline(data.availability_status.toLowerCase() === 'online');
-      }
+
+      // Always force offline when home screen loads
+      setIsOnline(false);
+      await updateAvailability({availability_status: 'offline'});
+
       const approved = vehicles.some(
         v => v.verification_status?.toUpperCase() === 'APPROVED',
       );

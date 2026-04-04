@@ -56,7 +56,7 @@ const MENU_SECTIONS = [
     ],
   },
   {
-    title: 'POLICIES & LEGAL',
+    title: 'HELP & COMPLIANCE',
     items: [
       {icon: 'shield-checkmark-outline', label: 'Privacy Policy',      route: 'PrivacyPolicy'},
       {icon: 'document-text-outline',    label: 'Terms & Conditions',  route: 'TermsCondition'},   // ← fixed

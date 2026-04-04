@@ -59,7 +59,7 @@ const FOR_RIDERS = [
   {
     icon: 'bicycle-outline',
     label: 'Multiple Vehicle Options',
-    desc: 'Ride with a bicycle, scooter, or motorcycle — whatever works best for you.',
+    desc: 'Ride with a Bike,Scooter,Auto,Pickup & Truck — whatever works best for you.',
     iconBg: '#FEF3C7',
     iconColor: '#92400E',
   },

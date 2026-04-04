@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,91 +9,137 @@ import {
   ImageBackground,
   Dimensions,
   Platform,
+  FlatList,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Responsive scaling functions
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
 const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
 
-const isSmallDevice = SCREEN_WIDTH < 375;
+const images = [
+  require('../assets/onboarding1.png'),
+  require('../assets/onboarding2.png'),
+  require('../assets/onboarding3.png'),
+];
 
 export default function WelcomeScreen({ navigation }: any) {
-  const handleRegister = () => {
-    navigation.navigate('Register');
-  };
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+  const autoScrollRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleLogin = () => {
-    navigation.navigate('Login');
-  };
+  const handleRegister = () => navigation.navigate('Register');
+  const handleLogin = () => navigation.navigate('Login');
+
+  useEffect(() => {
+    autoScrollRef.current = setInterval(() => {
+      setCurrentIndex(prev => {
+        const nextIndex = (prev + 1) % images.length;
+        flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+        return nextIndex;
+      });
+    }, 3000);
+
+    return () => {
+      if (autoScrollRef.current) clearInterval(autoScrollRef.current);
+    };
+  }, []);
+
+  const renderItem = ({ item }: { item: any }) => (
+    <ImageBackground
+      source={item}
+      style={styles.backgroundImage}
+      resizeMode="contain"
+      imageStyle={styles.backgroundImageStyle}
+    />
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Background Image */}
-      <ImageBackground
-        source={require('../assets/welcome.png')}
-        style={styles.backgroundImage}
-        resizeMode="contain"
-        imageStyle={styles.backgroundImageStyle}
-      >
-        <View style={styles.content}>
-          {/* Empty Space */}
-          <View style={styles.emptySpace} />
+      {/* ── Images only scroll here ─────────────────────────────────── */}
+      <View style={styles.imageContainer}>
+        <FlatList
+          ref={flatListRef}
+          data={images}
+          renderItem={renderItem}
+          horizontal
+          pagingEnabled
+          scrollEnabled={false}
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(_, index) => index.toString()}
+          getItemLayout={(_, index) => ({
+            length: SCREEN_WIDTH,
+            offset: SCREEN_WIDTH * index,
+            index,
+          })}
+        />
 
-          {/* Bottom Overlay with Gradient — starts lower so image text is visible */}
-          <LinearGradient
-            colors={[
-              'rgba(0, 0, 0, 0)',
-              'rgba(0, 0, 0, 0.2)',
-              'rgba(0, 0, 0, 0.6)',
-              'rgba(0, 0, 0, 0.92)',
-              '#000000',
-            ]}
-            style={styles.bottomOverlay}
+        {/* Gradient overlay on top of images */}
+        <LinearGradient
+          colors={[
+            'rgba(0, 0, 0, 0)',
+            'rgba(0, 0, 0, 0.2)',
+            'rgba(0, 0, 0, 0.6)',
+            'rgba(0, 0, 0, 0.92)',
+            '#000000',
+          ]}
+          style={styles.gradientOverlay}
+          pointerEvents="none"
+        />
+      </View>
+
+      {/* ── Bottom section stays fixed ──────────────────────────────── */}
+      <View style={styles.bottomOverlay}>
+        <View style={styles.buttonContainer}>
+
+          {/* Pagination Dots */}
+          <View style={styles.pagination}>
+            {images.map((_, index) => (
+              <View
+                key={index}
+                style={[styles.dot, index === currentIndex && styles.activeDot]}
+              />
+            ))}
+          </View>
+
+          {/* Create Account */}
+          <TouchableOpacity
+            style={styles.registerButton}
+            onPress={handleRegister}
+            activeOpacity={0.8}
           >
-            {/* Button Section */}
-            <View style={styles.buttonContainer}>
-              {/* Create Account */}
-              <TouchableOpacity
-                style={styles.registerButton}
-                onPress={handleRegister}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={['#3B82F6', '#2563EB']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.buttonGradient}
-                >
-                  <Text style={styles.registerButtonText}>Create Account</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+            <LinearGradient
+              colors={['#3B82F6', '#2563EB']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.buttonGradient}
+            >
+              <Text style={styles.registerButtonText}>Create Account</Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
-              {/* Login */}
-              <TouchableOpacity
-                style={styles.loginButton}
-                onPress={handleLogin}
-                activeOpacity={0.8}
-              >
-                <View style={styles.loginButtonInner}>
-                  <Text style={styles.loginButtonText}>Login</Text>
-                </View>
-              </TouchableOpacity>
-
-              <Text style={styles.termsText}>
-                By continuing, you agree to our{' '}
-                <Text style={styles.linkText}>Terms of Service</Text> and{' '}
-                <Text style={styles.linkText}>Privacy Policy</Text>
-              </Text>
+          {/* Login */}
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={handleLogin}
+            activeOpacity={0.8}
+          >
+            <View style={styles.loginButtonInner}>
+              <Text style={styles.loginButtonText}>Login</Text>
             </View>
-          </LinearGradient>
+          </TouchableOpacity>
+
+          <Text style={styles.termsText}>
+            By continuing, you agree to our{' '}
+            <Text style={styles.linkText}>Terms of Service</Text> and{' '}
+            <Text style={styles.linkText}>Privacy Policy</Text>
+          </Text>
         </View>
-      </ImageBackground>
+      </View>
     </SafeAreaView>
   );
 }
@@ -103,36 +149,68 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+
+  // ── Image area ────────────────────────────────────────────────────────────
+  imageContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.78,
+  },
   backgroundImage: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.78,
   },
   backgroundImageStyle: {
-    height: SCREEN_HEIGHT * 0.78,
-    top: 0,
     width: '100%',
+    height: '100%',
     resizeMode: 'cover',
   },
-  content: {
-    flex: 1,
-    justifyContent: 'flex-end',
+  gradientOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.35,
   },
-  emptySpace: {
-    flex: 1,
-  },
+
+  // ── Bottom fixed section ──────────────────────────────────────────────────
   bottomOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#000000',
     paddingHorizontal: scale(30),
-    paddingTop: verticalScale(80),      // increased so gradient starts higher, giving image text room
+    paddingTop: verticalScale(20),
     paddingBottom: Platform.OS === 'ios' ? verticalScale(30) : verticalScale(20),
   },
   buttonContainer: {
-    gap: verticalScale(10),             // was 16 — tighter gap between buttons
+    gap: verticalScale(10),
   },
 
-  // ── Create Account button (smaller) ─────────────────────────────────────
+  // ── Pagination Dots ───────────────────────────────────────────────────────
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: verticalScale(10),
+  },
+  dot: {
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    marginHorizontal: scale(4),
+  },
+  activeDot: {
+    backgroundColor: '#3B82F6',
+    width: moderateScale(24),
+  },
+
+  // ── Create Account button ─────────────────────────────────────────────────
   registerButton: {
-    borderRadius: moderateScale(12),    // was 15
+    borderRadius: moderateScale(12),
     shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
@@ -140,15 +218,15 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   buttonGradient: {
-    paddingVertical: verticalScale(13), // was 18
-    borderRadius: moderateScale(12),    // was 15
+    paddingVertical: verticalScale(13),
+    borderRadius: moderateScale(12),
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: verticalScale(46),       // was 54
+    minHeight: verticalScale(46),
   },
   registerButtonText: {
     color: '#FFFFFF',
-    fontSize: moderateScale(16),        // was 18
+    fontSize: moderateScale(16),
     fontWeight: '700',
     fontFamily: 'Poppins-Regular',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
@@ -156,11 +234,11 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
 
-  // ── Login button (smaller) ───────────────────────────────────────────────
+  // ── Login button ──────────────────────────────────────────────────────────
   loginButton: {
-    borderRadius: moderateScale(12),    // was 15
+    borderRadius: moderateScale(12),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderWidth: 1.5,                   // was 2
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.3)',
     overflow: 'hidden',
     shadowColor: '#000000',
@@ -170,30 +248,30 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   loginButtonInner: {
-    paddingVertical: verticalScale(13), // was 18
+    paddingVertical: verticalScale(13),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    minHeight: verticalScale(46),       // was 54
+    minHeight: verticalScale(46),
   },
   loginButtonText: {
     fontFamily: 'Poppins-Regular',
     color: '#FFFFFF',
-    fontSize: moderateScale(16),        // was 18
+    fontSize: moderateScale(16),
     fontWeight: '700',
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
 
-  // ── Terms ────────────────────────────────────────────────────────────────
+  // ── Terms ─────────────────────────────────────────────────────────────────
   termsText: {
     fontFamily: 'Poppins-Regular',
-    fontSize: moderateScale(12),        // was 13
+    fontSize: moderateScale(12),
     color: '#D1D5DB',
     textAlign: 'center',
     lineHeight: moderateScale(18),
-    marginTop: verticalScale(4),        // was 8
+    marginTop: verticalScale(4),
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
