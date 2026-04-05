@@ -850,4 +850,9 @@ const styles = StyleSheet.create({
     paddingVertical: verticalScale(14),
     alignItems: 'center',
   },
+  cancelBtnText: {
+    fontSize: moderateScale(15),
+    fontWeight: '600',
+    color: '#6B7280',
+  },
 });

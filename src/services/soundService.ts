@@ -1,5 +1,5 @@
 import Sound from 'react-native-sound';
-import {Platform} from 'react-native';
+import { Platform } from 'react-native';
 
 // Configure Sound for appropriate platform
 Sound.setCategory(Platform.OS === 'ios' ? 'Ambient' : 'Playback');
@@ -29,8 +29,8 @@ const initializeSound = (): Promise<boolean> => {
     isInitializing = true;
 
     try {
-      // Try to load the sound file
-      bookingAlertSound = new Sound(
+      // Capture instance locally so callback doesn't depend on module variable
+      const soundInstance = new Sound(
         'booking_alert.wav',
         Sound.MAIN_BUNDLE,
         (error: Error | null) => {
@@ -47,8 +47,9 @@ const initializeSound = (): Promise<boolean> => {
             return;
           }
 
+          (soundInstance as any).setNumberOfLoops(-1); // loop until stopped
+          bookingAlertSound = soundInstance;
           isInitialized = true;
-          (bookingAlertSound as any).setNumberOfLoops(-1); // loop until stopped
           console.log('[SoundService] Successfully loaded booking_alert.wav');
           resolve(true);
         },

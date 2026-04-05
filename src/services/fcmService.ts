@@ -1,5 +1,6 @@
 /**
  * Firebase Cloud Messaging service for the Zipto Rider app.
+ * Updated to use the new modular API (v22+) to remove deprecation warnings.
  *
  * SETUP REQUIRED (one-time):
  * 1. Add your project's google-services.json to android/app/
@@ -18,30 +19,54 @@
 type MessageHandler = (message: any) => void;
 let _unsubscribeForeground: (() => void) | null = null;
 
-function getMessaging(): any | null {
+// ─── Modular API helpers ───────────────────────────────────────────────────────
+
+function getMessagingModule(): any | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('@react-native-firebase/messaging').default;
+    return require('@react-native-firebase/messaging');
   } catch {
     return null;
   }
 }
 
 /**
+ * Returns the messaging instance using the new modular getMessaging() call.
+ * Replaces the old: messaging()
+ */
+function getMessagingInstance(): any | null {
+  try {
+    const mod = getMessagingModule();
+    if (!mod) return null;
+    // New modular API: use getMessaging() instead of messaging()
+    return mod.getMessaging ? mod.getMessaging() : null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+/**
  * Request notification permission and return the FCM token.
  * Returns null if permission is denied or Firebase is not configured.
  */
 export async function requestPermissionAndGetToken(): Promise<string | null> {
-  const messaging = getMessaging();
-  if (!messaging) return null;
-
   try {
-    const authStatus = await messaging().requestPermission();
+    const mod = getMessagingModule();
+    if (!mod) return null;
+
+    const instance = getMessagingInstance();
+    if (!instance) return null;
+
+    // New modular API: requestPermission(instance)
+    const authStatus = await mod.requestPermission(instance);
     // 1 = AUTHORIZED, 2 = PROVISIONAL
     const granted = authStatus === 1 || authStatus === 2;
     if (!granted) return null;
 
-    const token = await messaging().getToken();
+    // New modular API: getToken(instance)
+    const token = await mod.getToken(instance);
     return token ?? null;
   } catch {
     return null;
@@ -53,10 +78,15 @@ export async function requestPermissionAndGetToken(): Promise<string | null> {
  * Returns an unsubscribe function.
  */
 export function onForegroundMessage(handler: MessageHandler): () => void {
-  const messaging = getMessaging();
-  if (!messaging) return () => {};
   try {
-    return messaging().onMessage(handler);
+    const mod = getMessagingModule();
+    if (!mod) return () => {};
+
+    const instance = getMessagingInstance();
+    if (!instance) return () => {};
+
+    // New modular API: onMessage(instance, handler)
+    return mod.onMessage(instance, handler);
   } catch {
     return () => {};
   }
@@ -67,13 +97,18 @@ export function onForegroundMessage(handler: MessageHandler): () => void {
  * Must be called before the app fully boots (call from index.js or App.tsx root).
  */
 export function registerBackgroundHandler(): void {
-  const messaging = getMessaging();
-  if (!messaging) return;
   try {
-    messaging().setBackgroundMessageHandler(async (_msg: any) => {
-      // Message is handled by the OS notification tray automatically.
-      // Add custom background processing here if needed.
-    });
+    const mod = getMessagingModule();
+    if (!mod) return;
+
+    // New modular API: setBackgroundMessageHandler(handler)
+    // Note: this does NOT take an instance — it's a top-level function
+    if (mod.setBackgroundMessageHandler) {
+      mod.setBackgroundMessageHandler(async (_msg: any) => {
+        // Message is handled by the OS notification tray automatically.
+        // Add custom background processing here if needed.
+      });
+    }
   } catch {
     // Firebase not configured — safe to ignore
   }
@@ -83,10 +118,15 @@ export function registerBackgroundHandler(): void {
  * Subscribe to when the user taps a notification that opened the app.
  */
 export function onNotificationOpenedApp(handler: MessageHandler): () => void {
-  const messaging = getMessaging();
-  if (!messaging) return () => {};
   try {
-    return messaging().onNotificationOpenedApp(handler);
+    const mod = getMessagingModule();
+    if (!mod) return () => {};
+
+    const instance = getMessagingInstance();
+    if (!instance) return () => {};
+
+    // New modular API: onNotificationOpenedApp(instance, handler)
+    return mod.onNotificationOpenedApp(instance, handler);
   } catch {
     return () => {};
   }
@@ -97,10 +137,15 @@ export function onNotificationOpenedApp(handler: MessageHandler): () => void {
  * Returns the initial notification if so.
  */
 export async function getInitialNotification(): Promise<any | null> {
-  const messaging = getMessaging();
-  if (!messaging) return null;
   try {
-    return await messaging().getInitialNotification();
+    const mod = getMessagingModule();
+    if (!mod) return null;
+
+    const instance = getMessagingInstance();
+    if (!instance) return null;
+
+    // New modular API: getInitialNotification(instance)
+    return await mod.getInitialNotification(instance);
   } catch {
     return null;
   }
@@ -111,10 +156,15 @@ export async function getInitialNotification(): Promise<any | null> {
  * Should call registerFcmToken again when the token changes.
  */
 export function onTokenRefresh(handler: (token: string) => void): () => void {
-  const messaging = getMessaging();
-  if (!messaging) return () => {};
   try {
-    return messaging().onTokenRefresh(handler);
+    const mod = getMessagingModule();
+    if (!mod) return () => {};
+
+    const instance = getMessagingInstance();
+    if (!instance) return () => {};
+
+    // New modular API: onTokenRefresh(instance, handler)
+    return mod.onTokenRefresh(instance, handler);
   } catch {
     return () => {};
   }

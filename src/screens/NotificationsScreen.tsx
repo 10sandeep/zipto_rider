@@ -76,7 +76,31 @@ function timeAgo(ts: number): string {
   const diff = Math.floor((Date.now() - ts) / 1000);
   if (diff < 60) {return `${diff}s ago`;}
   if (diff < 3600) {return `${Math.floor(diff / 60)}m ago`;}
-  return `${Math.floor(diff / 3600)}h ago`;}
+  return `${Math.floor(diff / 3600)}h ago`;
+}
+
+/** Safely coerce any API response to DriverNotificationData[] */
+function toNotifArray(data: unknown): DriverNotificationData[] {
+  if (Array.isArray(data)) {return data as DriverNotificationData[];}
+  // Some APIs wrap in { data: [...] } or { notifications: [...] }
+  if (data && typeof data === 'object') {
+    const d = data as Record<string, unknown>;
+    if (Array.isArray(d.data)) {return d.data as DriverNotificationData[];}
+    if (Array.isArray(d.notifications)) {return d.notifications as DriverNotificationData[];}
+  }
+  return [];
+}
+
+/** Safely coerce any API response to AvailableBooking[] */
+function toBookingArray(data: unknown): AvailableBooking[] {
+  if (Array.isArray(data)) {return data as AvailableBooking[];}
+  if (data && typeof data === 'object') {
+    const d = data as Record<string, unknown>;
+    if (Array.isArray(d.data)) {return d.data as AvailableBooking[];}
+    if (Array.isArray(d.bookings)) {return d.bookings as AvailableBooking[];}
+  }
+  return [];
+}
 
 const NOTIF_ICON: Record<DriverNotificationData['type'], string> = {
   approval: 'checkmark-circle',
@@ -104,14 +128,20 @@ export default function NotificationsScreen({navigation}: any) {
 
   const token = useAuthStore(s => s.token);
 
+  // Unread count — shown as badge on notification icon from other screens
+  const unreadCount = notifications.filter(n => !n.read).length;
+
   // ── Fetch available bookings ───────────────────────────────────
   const fetchBookings = useCallback(async () => {
     setLoadingBookings(true);
     try {
-      const data = await getAvailableBookings();
+      const raw = await getAvailableBookings();
       if (mountedRef.current) {
-        setBookings(data.map(apiToItem));
+        setBookings(toBookingArray(raw).map(apiToItem));
       }
+    } catch (err) {
+      console.warn('fetchBookings error:', err);
+      if (mountedRef.current) {setBookings([]);}
     } finally {
       if (mountedRef.current) {setLoadingBookings(false);}
     }
@@ -121,12 +151,14 @@ export default function NotificationsScreen({navigation}: any) {
   const fetchNotifications = useCallback(async () => {
     setLoadingNotifs(true);
     try {
-      const data = await getNotifications();
+      const raw = await getNotifications();
       if (mountedRef.current) {
-        setNotifications(data);
-        // mark as read in background
+        setNotifications(toNotifArray(raw));
         markNotificationsRead().catch(() => {});
       }
+    } catch (err) {
+      console.warn('fetchNotifications error:', err);
+      if (mountedRef.current) {setNotifications([]);}
     } finally {
       if (mountedRef.current) {setLoadingNotifs(false);}
     }
@@ -146,23 +178,27 @@ export default function NotificationsScreen({navigation}: any) {
     if (!token) {return;}
 
     onBookingAvailable(offer => {
-      if (!mountedRef.current) {return;}
+      if (!mountedRef.current || !offer) {return;}
       setBookings(prev => {
-        if (prev.some(i => i.bookingId === offer.bookingId)) {return prev;}
-        return [offerToItem(offer), ...prev];
+        const safeArr = Array.isArray(prev) ? prev : [];
+        if (safeArr.some(i => i.bookingId === offer.bookingId)) {return safeArr;}
+        return [offerToItem(offer), ...safeArr];
       });
     });
 
     onBookingTaken(bookingId => {
-      if (!mountedRef.current) {return;}
-      setBookings(prev => prev.filter(i => i.bookingId !== bookingId));
+      if (!mountedRef.current || !bookingId) {return;}
+      setBookings(prev =>
+        (Array.isArray(prev) ? prev : []).filter(i => i.bookingId !== bookingId),
+      );
     });
 
     onNewNotification(notif => {
-      if (!mountedRef.current) {return;}
+      if (!mountedRef.current || !notif) {return;}
       setNotifications(prev => {
-        if (prev.some(n => n.id === notif.id)) {return prev;}
-        return [{...notif, read: true}, ...prev];
+        const safeArr = Array.isArray(prev) ? prev : [];
+        if (safeArr.some(n => n.id === notif.id)) {return safeArr;}
+        return [{...notif, read: false}, ...safeArr];
       });
     });
 
@@ -177,25 +213,25 @@ export default function NotificationsScreen({navigation}: any) {
   const handleAccept = useCallback(
     async (item: BookingItem) => {
       if (accepting) {return;}
-      setBookings(prev => prev.filter(i => i.bookingId !== item.bookingId));
+      setBookings(prev => (Array.isArray(prev) ? prev : []).filter(i => i.bookingId !== item.bookingId));
       setAccepting(item.bookingId);
       try {
         const vehicles = await getMyVehicles();
         if (!vehicles || vehicles.length === 0) {
           Alert.alert('No Vehicle', 'Add a vehicle first to accept bookings.');
-          setBookings(prev => [item, ...prev]);
+          setBookings(prev => [item, ...(Array.isArray(prev) ? prev : [])]);
           return;
         }
-        const errorMsg = await acceptBooking(item.bookingId, vehicles[0].id);
-        if (errorMsg !== null) {
-          Alert.alert('Could Not Accept', errorMsg);
-          setBookings(prev => [item, ...prev]);
+        const result = await acceptBooking(item.bookingId, vehicles[0].id);
+        if (typeof result === 'string') {
+          Alert.alert('Could Not Accept', result);
+          setBookings(prev => [item, ...(Array.isArray(prev) ? prev : [])]);
         } else {
           Alert.alert('Accepted!', 'Head to the pickup location.');
         }
       } catch {
         Alert.alert('Error', 'Something went wrong. Please try again.');
-        setBookings(prev => [item, ...prev]);
+        setBookings(prev => [item, ...(Array.isArray(prev) ? prev : [])]);
       } finally {
         if (mountedRef.current) {setAccepting(null);}
       }
@@ -223,7 +259,16 @@ export default function NotificationsScreen({navigation}: any) {
           activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={moderateScale(24)} color="#1C1C1E" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+          {unreadCount > 0 && (
+            <View style={styles.headerBadge}>
+              <Text style={styles.headerBadgeText}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </View>
+          )}
+        </View>
         <TouchableOpacity
           onPress={handleRefresh}
           hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
@@ -375,6 +420,63 @@ export default function NotificationsScreen({navigation}: any) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Badge helper — export and use this on any screen that has a notification icon
+// Example usage in HomeScreen:
+//   import { NotificationBadgeIcon } from './NotificationsScreen';
+//   <NotificationBadgeIcon count={unreadCount} onPress={...} />
+// ─────────────────────────────────────────────────────────────────────────────
+export function NotificationBadgeIcon({
+  count,
+  onPress,
+  size = 24,
+  color = '#1C1C1E',
+}: {
+  count: number;
+  onPress: () => void;
+  size?: number;
+  color?: string;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+      activeOpacity={0.7}
+      style={{position: 'relative'}}>
+      <Ionicons name="notifications-outline" size={size} color={color} />
+      {count > 0 && (
+        <View style={badgeStyles.badge}>
+          <Text style={badgeStyles.badgeText}>
+            {count > 99 ? '99+' : count}
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+const badgeStyles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    minWidth: moderateScale(16),
+    height: moderateScale(16),
+    borderRadius: moderateScale(8),
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  badgeText: {
+    fontSize: moderateScale(9),
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+});
+
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#F8F9FA'},
   header: {
@@ -394,14 +496,34 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
+  headerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: scale(10),
+  },
   headerTitle: {
     fontSize: moderateScale(18),
     fontWeight: '700',
     fontFamily: 'Poppins-Regular',
     color: '#1C1C1E',
-    flex: 1,
     textAlign: 'center',
-    marginHorizontal: scale(10),
+  },
+  headerBadge: {
+    marginLeft: scale(6),
+    minWidth: moderateScale(18),
+    height: moderateScale(18),
+    borderRadius: moderateScale(9),
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  headerBadgeText: {
+    fontSize: moderateScale(10),
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   centered: {
     flex: 1,
@@ -437,7 +559,6 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: verticalScale(8),
   },
-  // ── Booking card ────────────────────────────────────────────────
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: moderateScale(16),
@@ -553,7 +674,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  // ── System notification card ────────────────────────────────────
   notifCard: {
     flexDirection: 'row',
     alignItems: 'center',

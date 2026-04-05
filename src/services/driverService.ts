@@ -541,7 +541,7 @@ export const startTrip = async (bookingId: string, pickupOtp: string): Promise<v
 };
 
 export interface CompleteTripPayload {
-  delivery_otp: string;
+  delivery_otp?: string;
   payment_method?: 'cash' | 'online';
   has_toll?: boolean;
   toll_amount?: number;

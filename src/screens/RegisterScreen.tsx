@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {sendRegisterOTP, getApiErrorMessage} from '../services/authService';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
@@ -30,9 +29,10 @@ const BRAND_LIGHT = '#E8E9F8';
 const BRAND_MID   = '#4347C4';
 
 export default function RegisterScreen({navigation}: any) {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [countryCode] = useState('+91');
-  const [isLoading, setIsLoading] = useState(false);
+  const [phoneNumber, setPhoneNumber]   = useState('');
+  const [countryCode]                   = useState('+91');
+  const [isLoading, setIsLoading]       = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false); // ← new
 
   // ── ALL LOGIC UNCHANGED ────────────────────────────────────────────────────
   const handleSendOTP = async () => {
@@ -47,35 +47,32 @@ export default function RegisterScreen({navigation}: any) {
     const fullPhone = countryCode + trimmedPhone;
     setIsLoading(true);
     try {
-      const res = await sendRegisterOTP(fullPhone);
-      if (res.isNewUser === false) {
+      await sendRegisterOTP(fullPhone);
+      navigation.navigate('OTPVerification', {
+        phoneNumber: fullPhone,
+        flow: 'register',
+      });
+    } catch (error: any) {
+      if (error?.response?.status === 409) {
         Alert.alert(
           'Already Registered',
           'This number is already registered as a driver. Please login instead.',
           [
             {text: 'Cancel', style: 'cancel'},
-            {
-              text: 'Login',
-              onPress: () => navigation.navigate('Login'),
-            },
+            {text: 'Login', onPress: () => navigation.navigate('Login')},
           ],
         );
-        return;
+      } else {
+        const message = getApiErrorMessage(error);
+        Alert.alert('Failed to Send OTP', message, [{text: 'OK'}]);
       }
-      navigation.navigate('OTPVerification', {
-        phoneNumber: fullPhone,
-        flow: 'register',
-      });
-    } catch (error) {
-      const message = getApiErrorMessage(error);
-      Alert.alert('Failed to Send OTP', message, [{text: 'OK'}]);
     } finally {
       setIsLoading(false);
     }
   };
   // ──────────────────────────────────────────────────────────────────────────
 
-  const isValid = phoneNumber.length === 10;
+  const isValid = phoneNumber.length === 10 && termsAccepted; // ← terms must be ticked
 
   return (
     <KeyboardAvoidingView
@@ -100,7 +97,6 @@ export default function RegisterScreen({navigation}: any) {
 
         {/* Icon + headline */}
         <View style={styles.heroContent}>
-        
           <Text style={styles.heroTitle}>Create Account</Text>
           <Text style={styles.heroSubtitle}>
             Join Zipto Rider — deliver smarter,{'\n'}earn better.
@@ -152,6 +148,34 @@ export default function RegisterScreen({navigation}: any) {
           We'll send a 6-digit OTP to verify your number.
         </Text>
 
+        {/* ── Terms & Conditions Checkbox ─────────────────────────────── */}
+        <TouchableOpacity
+          style={styles.checkboxRow}
+          onPress={() => setTermsAccepted(prev => !prev)}
+          activeOpacity={0.7}>
+          {/* Checkbox box */}
+          <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+            {termsAccepted && (
+              <Ionicons name="checkmark" size={moderateScale(13)} color="#FFFFFF" />
+            )}
+          </View>
+          {/* Label */}
+          <Text style={styles.checkboxLabel}>
+            By continuing, you agree to Zipto's{' '}
+            <Text
+              style={styles.checkboxLink}
+              onPress={() => navigation.navigate('TermsCondition')}>
+              Terms & Conditions
+            </Text>
+            {' '}and{' '}
+            <Text
+              style={styles.checkboxLink}
+              onPress={() => navigation.navigate('PrivacyPolicy')}>
+              Privacy Policy
+            </Text>
+          </Text>
+        </TouchableOpacity>
+
         {/* Send OTP button */}
         <TouchableOpacity
           style={[
@@ -182,12 +206,14 @@ export default function RegisterScreen({navigation}: any) {
           <View style={styles.dividerLine} />
         </View>
 
-        {/* Terms */}
-        <Text style={styles.termsText}>
-          By continuing, you agree to our{' '}
-          <Text style={styles.linkText}>Terms of Service</Text>
-          {'  '}and{'  '}
-          <Text style={styles.linkText}>Privacy Policy</Text>
+        {/* Bottom note */}
+        <Text style={styles.bottomNote}>
+          Already have an account?{' '}
+          <Text
+            style={styles.linkText}
+            onPress={() => navigation.navigate('Login')}>
+            Sign In
+          </Text>
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -213,7 +239,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // Decorative background circles
   decCircleLarge: {
     position: 'absolute',
     width: scale(220),
@@ -249,18 +274,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
 
-  iconRing: {
-    width: moderateScale(64),
-    height: moderateScale(64),
-    borderRadius: moderateScale(20),
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: verticalScale(16),
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-
   heroTitle: {
     fontSize: moderateScale(isSmallDevice ? 26 : 30),
     fontWeight: '800',
@@ -283,7 +296,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: CARD_RADIUS,
     borderTopRightRadius: CARD_RADIUS,
-    marginTop: -moderateScale(4), // bleed up slightly into hero
+    marginTop: -moderateScale(4),
   },
 
   formContent: {
@@ -379,8 +392,44 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(12),
     color: '#9898B0',
     fontFamily: 'Poppins-Regular',
-    marginBottom: verticalScale(28),
+    marginBottom: verticalScale(20),
     letterSpacing: 0.1,
+  },
+
+  // ── Checkbox ────────────────────────────────────────────────────────────────
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: verticalScale(24),
+    gap: scale(10),
+  },
+  checkbox: {
+    width: moderateScale(20),
+    height: moderateScale(20),
+    borderRadius: moderateScale(5),
+    borderWidth: 2,
+    borderColor: '#D0D0E0',
+    backgroundColor: '#FAFAFE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: verticalScale(1),
+    flexShrink: 0,
+  },
+  checkboxChecked: {
+    backgroundColor: BRAND,
+    borderColor: BRAND,
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: moderateScale(12.5),
+    color: '#9898B0',
+    lineHeight: moderateScale(20),
+    fontFamily: 'Poppins-Regular',
+  },
+  checkboxLink: {
+    color: BRAND,
+    fontFamily: 'Poppins-SemiBold',
+    fontWeight: '600',
   },
 
   // OTP button
@@ -435,17 +484,17 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 
-  // Terms
-  termsText: {
+  // Bottom note
+  bottomNote: {
     fontSize: moderateScale(12.5),
     color: '#9898B0',
     textAlign: 'center',
     lineHeight: moderateScale(20),
     fontFamily: 'Poppins-Regular',
-    paddingHorizontal: scale(10),
   },
   linkText: {
     color: BRAND,
     fontFamily: 'Poppins-SemiBold',
+    fontWeight: '600',
   },
 });
