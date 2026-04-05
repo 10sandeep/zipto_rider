@@ -298,7 +298,7 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
 
         {/* ── Contact Information ──────────────────────────────────────── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>CONTACT US</Text>
+          <Text style={styles.sectionTitle}>HELP & COMPLIANCE</Text>
         </View>
 
         <View style={styles.menuCard}>

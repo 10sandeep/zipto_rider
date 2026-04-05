@@ -401,7 +401,7 @@ export default function EarningsScreen({navigation}: any) {
 
         {/* ── Contact Section ──────────────────────────────────────────── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>CONTACT US</Text>
+          <Text style={styles.sectionTitle}>HELP & COMPLIANCE</Text>
         </View>
 
         <View style={styles.menuCard}>

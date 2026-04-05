@@ -231,7 +231,7 @@ export default function TermsScreen({ navigation }: any) {
 
         {/* ── Contact Details ───────────────────────────────────────────── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>CONTACT & LEGAL DETAILS</Text>
+          <Text style={styles.sectionTitle}>HELP & COMPLIANCE</Text>
         </View>
 
         <View style={styles.menuCard}>

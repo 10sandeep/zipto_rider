@@ -373,7 +373,7 @@ export default function AboutUsScreen({navigation}: any) {
 
         {/* ── Contact Us ───────────────────────────────────────────────── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>CONTACT US</Text>
+          <Text style={styles.sectionTitle}>HELP & COMPLIANCE</Text>
         </View>
 
         <View style={styles.menuCard}>
