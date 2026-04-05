@@ -82,9 +82,8 @@ export const sendRegisterOTP = async (phone: string): Promise<SendOTPResponse> =
  * Endpoint: POST /auth/driver/register
  */
 export const sendLoginOTP = async (phone: string): Promise<SendOTPResponse> => {
-  const response = await apiClient.post<SendOTPResponse>(ENDPOINTS.DRIVER_REGISTER, {
+  const response = await apiClient.post<SendOTPResponse>(ENDPOINTS.DRIVER_LOGIN, {
     phone,
-    role: 'driver',
   });
   return response.data;
 };

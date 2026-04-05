@@ -21,7 +21,8 @@ export const API_TIMEOUT = 15000; // 15 seconds
 /** All API endpoint paths */
 export const ENDPOINTS = {
   // Auth
-  DRIVER_REGISTER: '/auth/driver/register', // POST — send OTP (register & login)
+  DRIVER_REGISTER: '/auth/driver/register', // POST — send OTP (new drivers only)
+  DRIVER_LOGIN: '/auth/driver/login',       // POST — send OTP (existing drivers)
   VERIFY_OTP: '/auth/verify-otp',           // POST — verify OTP
   REFRESH_TOKEN: '/auth/refresh-token',     // POST — refresh access token
   VERIFICATION_STATUS: '/driver/verification-status', // GET — check status
