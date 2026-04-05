@@ -48,6 +48,7 @@ export interface DriverProfile {
   wallet_balance?: string | number;
   average_rating?: string | number | null;
   total_trips?: number;
+  total_ratings?: number;
   availability_status?: string;
   address?: string | null;
 }
@@ -416,7 +417,7 @@ export interface EarningsBreakdown {
 }
 
 export interface EarningsDashboard {
-  period: 'today' | 'week' | 'month';
+  period: 'today' | 'week' | 'month' | 'all';
   wallet_balance: number;
   total_earnings: number;
   trip_count: number;
@@ -424,7 +425,7 @@ export interface EarningsDashboard {
 }
 
 export const getEarningsDashboard = async (
-  period: 'today' | 'week' | 'month' = 'today',
+  period: 'today' | 'week' | 'month' | 'all' = 'today',
 ): Promise<EarningsDashboard> => {
   const response = await apiClient.get<{data: EarningsDashboard; success: boolean}>(
     `${ENDPOINTS.DRIVER_EARNINGS}?period=${period}`,

@@ -52,9 +52,20 @@ export default function RegisterScreen({navigation}: any) {
         phoneNumber: fullPhone,
         flow: 'register',
       });
-    } catch (error) {
-      const message = getApiErrorMessage(error);
-      Alert.alert('Failed to Send OTP', message, [{text: 'OK'}]);
+    } catch (error: any) {
+      if (error?.response?.status === 409) {
+        Alert.alert(
+          'Already Registered',
+          'This number is already registered as a driver. Please login instead.',
+          [
+            {text: 'Cancel', style: 'cancel'},
+            {text: 'Login', onPress: () => navigation.navigate('Login')},
+          ],
+        );
+      } else {
+        const message = getApiErrorMessage(error);
+        Alert.alert('Failed to Send OTP', message, [{text: 'OK'}]);
+      }
     } finally {
       setIsLoading(false);
     }

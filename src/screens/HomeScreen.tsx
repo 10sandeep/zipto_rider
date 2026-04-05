@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback, useRef} from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,17 +17,31 @@ import {
   PanResponder,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import Sound from 'react-native-sound';
+import { playBookingAlertSound, stopBookingAlertSound, releaseBookingAlertSound, pauseBookingAlertSound } from '../services/soundService';
 
-Sound.setCategory('Playback');
-const bookingAlertSound = new Sound('booking_alert.wav', Sound.MAIN_BUNDLE, err => {
-  if (err) {
-    // Sound failed to load — silent fallback
-  }
-});
+const GMAPS_KEY = 'AIzaSyBk3embTThBzPAZBmSlIYue_JFHk2iBe9A';
+
+const reverseGeocodeCoords = async (lat: number, lng: number): Promise<string | null> => {
+  try {
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GMAPS_KEY}&result_type=sublocality%7Clocality&language=en`,
+    );
+    const data = await res.json();
+    if (data.status === 'OK' && data.results?.length > 0) {
+      const comps: Array<{ types: string[]; short_name: string }> =
+        data.results[0].address_components || [];
+      const sub = comps.find(
+        c => c.types.includes('sublocality_level_1') || c.types.includes('sublocality'),
+      );
+      const local = comps.find(c => c.types.includes('locality'));
+      return sub?.short_name || local?.short_name || null;
+    }
+  } catch { }
+  return null;
+};
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import {useAuthStore} from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
 import {
   getDriverProfile,
   getDailyStats,
@@ -36,6 +50,7 @@ import {
   getMyVehicles,
   acceptBooking,
   getNotifications,
+  getCalendar,
 } from '../services/driverService';
 import {
   connectSocket,
@@ -48,9 +63,9 @@ import {
   offNoDriversFound,
   BookingOffer,
 } from '../services/socketService';
-import {rejectBooking} from '../services/driverService';
+import { rejectBooking } from '../services/driverService';
 
-const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
 const verticalScale = (size: number) => (SCREEN_HEIGHT / 812) * size;
@@ -139,7 +154,7 @@ const SwipeToAccept = ({
         <Text style={styles.sliderText}>SLIDE TO ACCEPT  »</Text>
       </View>
       <Animated.View
-        style={[styles.sliderThumb, {transform: [{translateX}]}]}
+        style={[styles.sliderThumb, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}>
         <Ionicons name="chevron-forward" size={moderateScale(26)} color={C.white} />
       </Animated.View>
@@ -149,7 +164,7 @@ const SwipeToAccept = ({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function HomeScreen({navigation}: any) {
+export default function HomeScreen({ navigation }: any) {
   const [isOnline, setIsOnline] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [hasApprovedVehicle, setHasApprovedVehicle] = useState<boolean | null>(null);
@@ -168,6 +183,7 @@ export default function HomeScreen({navigation}: any) {
   }, []);
 
   const dismissOffer = useCallback(() => {
+    stopBookingAlertSound();
     clearCountdown();
     setIncomingBooking(null);
   }, [clearCountdown]);
@@ -187,7 +203,7 @@ export default function HomeScreen({navigation}: any) {
       const result = await acceptBooking(bookingSnapshot.bookingId, primaryVehicleId);
       if (typeof result !== 'string') {
         fetchStats();
-        navigation.navigate('Navigation', {bookingId: result.realBookingId});
+        navigation.navigate('Navigation', { bookingId: result.realBookingId });
       } else {
         Alert.alert('Could Not Accept', result);
       }
@@ -205,12 +221,17 @@ export default function HomeScreen({navigation}: any) {
     rejectBooking(bookingId);
   }, [incomingBooking, dismissOffer]);
 
-  const {profile, setProfile, user} = useAuthStore();
+  const { profile, setProfile, user } = useAuthStore();
   const [hasUnread, setHasUnread] = useState(false);
   const [dailyStats, setDailyStats] = useState({
     today_earnings: 0,
     today_orders: 0,
   });
+  const [attendanceSummary, setAttendanceSummary] = useState({
+    days_present: 0,
+    total_days: 0,
+  });
+  const [locationName, setLocationName] = useState<string | null>(null);
 
   // ─── Always start offline on home screen load ─────────────────────────────
   const fetchProfile = useCallback(async () => {
@@ -223,13 +244,13 @@ export default function HomeScreen({navigation}: any) {
 
       // Always force offline when home screen loads
       setIsOnline(false);
-      await updateAvailability({availability_status: 'offline'});
+      await updateAvailability({ availability_status: 'offline' });
 
       const approved = vehicles.some(
         v => v.verification_status?.toUpperCase() === 'APPROVED',
       );
       setHasApprovedVehicle(approved);
-    } catch {/* non-critical */}
+    } catch {/* non-critical */ }
   }, [setProfile]);
 
   const handleToggleOnline = async (value: boolean) => {
@@ -238,7 +259,7 @@ export default function HomeScreen({navigation}: any) {
       Alert.alert(
         'Vehicle Not Verified',
         'You cannot go online until your vehicle has been verified by the admin. Please wait for approval.',
-        [{text: 'OK'}],
+        [{ text: 'OK' }],
       );
       return;
     }
@@ -246,7 +267,7 @@ export default function HomeScreen({navigation}: any) {
     setIsOnline(value);
     try {
       const status = value ? 'online' : 'offline';
-      const success = await updateAvailability({availability_status: status});
+      const success = await updateAvailability({ availability_status: status });
       if (!success) {
         setIsOnline(!value);
         Alert.alert('Error', 'Failed to update availability status.');
@@ -266,7 +287,7 @@ export default function HomeScreen({navigation}: any) {
         today_earnings: stats.today_earnings || 0,
         today_orders: stats.today_orders || 0,
       });
-    } catch {/* non-critical */}
+    } catch {/* non-critical */ }
   }, []);
 
   useEffect(() => {
@@ -274,7 +295,23 @@ export default function HomeScreen({navigation}: any) {
     fetchStats();
     getNotifications()
       .then(notifs => setHasUnread(notifs.some(n => !n.read)))
-      .catch(() => {});
+      .catch(() => { });
+    const now = new Date();
+    getCalendar('month', now.getFullYear(), now.getMonth() + 1)
+      .then(cal => setAttendanceSummary({
+        days_present: cal.summary.days_present,
+        total_days: cal.summary.total_days,
+      }))
+      .catch(() => { });
+    // Get location name on mount
+    Geolocation.getCurrentPosition(
+      async pos => {
+        const name = await reverseGeocodeCoords(pos.coords.latitude, pos.coords.longitude);
+        if (name) { setLocationName(name); }
+      },
+      () => { },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 },
+    );
   }, [fetchProfile, fetchStats]);
 
   useEffect(() => {
@@ -334,13 +371,13 @@ export default function HomeScreen({navigation}: any) {
       if (!hasPermission) return;
       Geolocation.getCurrentPosition(
         async position => {
-          const {latitude, longitude} = position.coords;
+          const { latitude, longitude } = position.coords;
           try {
-            await updateLocation({latitude, longitude});
-          } catch {/* non-critical */}
+            await updateLocation({ latitude, longitude });
+          } catch {/* non-critical */ }
         },
-        _error => {/* geolocation error — silent */},
-        {enableHighAccuracy: false, timeout: 20000, maximumAge: 10000},
+        _error => {/* geolocation error — silent */ },
+        { enableHighAccuracy: false, timeout: 20000, maximumAge: 10000 },
       );
     };
     if (isOnline) {
@@ -360,12 +397,13 @@ export default function HomeScreen({navigation}: any) {
           connectSocket(activeToken);
           onBookingOffer(offer => {
             setIncomingBooking(offer);
-            bookingAlertSound.stop(() => {
-              bookingAlertSound.play();
-            });
+            // Play booking alert sound safely with error handling
+            playBookingAlertSound().catch(err =>
+              console.warn('[HomeScreen] Failed to play booking sound:', err),
+            );
           });
           onOfferExpired(_bookingId => dismissOffer());
-          onNoDriversFound(_bookingId => {});
+          onNoDriversFound(_bookingId => { });
         }
       } else {
         offBookingOffer();
@@ -386,8 +424,16 @@ export default function HomeScreen({navigation}: any) {
       offOfferExpired();
       offNoDriversFound();
       disconnectSocket();
+      pauseBookingAlertSound();
     };
   }, [isOnline, dismissOffer]);
+
+  // Cleanup sound resources on component unmount
+  useEffect(() => {
+    return () => {
+      releaseBookingAlertSound();
+    };
+  }, []);
 
   const displayName = profile?.name || user?.name || 'Partner';
   const firstName = displayName.split(' ')[0];
@@ -422,7 +468,7 @@ export default function HomeScreen({navigation}: any) {
             style={styles.notificationButton}
             onPress={() => navigation.navigate('Notifications')}
             activeOpacity={0.7}
-            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons
               name="notifications-outline"
               size={moderateScale(22)}
@@ -438,7 +484,7 @@ export default function HomeScreen({navigation}: any) {
             <View
               style={[
                 styles.onlineStatusDot,
-                {backgroundColor: isOnline ? C.green : C.textMuted},
+                { backgroundColor: isOnline ? C.green : C.textMuted },
               ]}
             />
             <View>
@@ -449,8 +495,8 @@ export default function HomeScreen({navigation}: any) {
                 {isOnline
                   ? 'Accepting new delivery requests'
                   : hasApprovedVehicle === false
-                  ? 'Vehicle not verified yet'
-                  : 'Toggle to start accepting orders'}
+                    ? 'Vehicle not verified yet'
+                    : 'Toggle to start accepting orders'}
               </Text>
             </View>
           </View>
@@ -458,12 +504,12 @@ export default function HomeScreen({navigation}: any) {
             value={isOnline}
             onValueChange={handleToggleOnline}
             disabled={isToggling}
-            trackColor={{false: 'rgba(255,255,255,0.2)', true: C.green}}
+            trackColor={{ false: 'rgba(255,255,255,0.2)', true: C.green }}
             thumbColor={C.white}
             style={{
               transform: [
-                {scaleX: Platform.OS === 'ios' ? 0.9 : 1},
-                {scaleY: Platform.OS === 'ios' ? 0.9 : 1},
+                { scaleX: Platform.OS === 'ios' ? 0.9 : 1 },
+                { scaleY: Platform.OS === 'ios' ? 0.9 : 1 },
               ],
             }}
           />
@@ -500,7 +546,7 @@ export default function HomeScreen({navigation}: any) {
         <View style={styles.statsContainer}>
           {/* Orders */}
           <View style={styles.statCard}>
-            <View style={[styles.statIconWrap, {backgroundColor: C.primaryLight}]}>
+            <View style={[styles.statIconWrap, { backgroundColor: C.primaryLight }]}>
               <MaterialCommunityIcons
                 name="package-variant-closed"
                 size={moderateScale(22)}
@@ -516,14 +562,14 @@ export default function HomeScreen({navigation}: any) {
 
           {/* Earnings */}
           <View style={styles.statCard}>
-            <View style={[styles.statIconWrap, {backgroundColor: C.greenLight}]}>
+            <View style={[styles.statIconWrap, { backgroundColor: C.greenLight }]}>
               <Ionicons
                 name="wallet-outline"
                 size={moderateScale(22)}
                 color={C.greenDark}
               />
             </View>
-            <Text style={[styles.statValue, {color: C.green}]}>
+            <Text style={[styles.statValue, { color: C.green }]}>
               ₹{dailyStats.today_earnings}
             </Text>
             <Text style={styles.statLabel}>Earnings</Text>
@@ -536,7 +582,7 @@ export default function HomeScreen({navigation}: any) {
         </View>
 
         <View style={styles.statusCard}>
-          <View style={[styles.statusIconWrap, {backgroundColor: isOnline ? C.greenLight : C.primaryLight}]}>
+          <View style={[styles.statusIconWrap, { backgroundColor: isOnline ? C.greenLight : C.primaryLight }]}>
             <Ionicons
               name={isOnline ? 'radio-outline' : 'moon-outline'}
               size={moderateScale(26)}
@@ -645,8 +691,8 @@ export default function HomeScreen({navigation}: any) {
                   style={[
                     styles.paidByOfferBadge,
                     incomingBooking.paid_by === 'receiver'
-                      ? {backgroundColor: '#EDE9FE'}
-                      : {backgroundColor: C.primaryLight},
+                      ? { backgroundColor: '#EDE9FE' }
+                      : { backgroundColor: C.primaryLight },
                   ]}>
                   <Ionicons
                     name={
@@ -763,6 +809,17 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.55)',
     marginTop: verticalScale(4),
     fontWeight: '500',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: verticalScale(3),
+    gap: scale(3),
+  },
+  locationText: {
+    fontSize: moderateScale(13),
+    color: '#3B82F6',
+    fontWeight: '600',
   },
   notificationButton: {
     width: moderateScale(42),
@@ -881,7 +938,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: '#0F172A',
-    shadowOffset: {width: 0, height: 3},
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.06,
     shadowRadius: 10,
     elevation: 3,
@@ -973,7 +1030,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingBottom: Platform.OS === 'ios' ? verticalScale(40) : verticalScale(20),
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: -4},
+    shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 12,
@@ -1182,7 +1239,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: C.primary,
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 5,

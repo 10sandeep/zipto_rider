@@ -13,6 +13,7 @@ import {ENDPOINTS} from '../config/api.config';
 export interface SendOTPResponse {
   message: string;
   success: boolean;
+  isNewUser?: boolean;
 }
 
 export interface VerifyOTPData {

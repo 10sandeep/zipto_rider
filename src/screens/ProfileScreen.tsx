@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useAuthStore} from '../store/authStore';
+import {getDriverProfile} from '../services/driverService';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -68,11 +69,18 @@ const MENU_SECTIONS = [
 ];
 
 export default function ProfileScreen({navigation}: any) {
-  const {user, profile, clearAuth} = useAuthStore();
+  const {user, profile, clearAuth, setProfile} = useAuthStore();
+
+  useEffect(() => {
+    getDriverProfile()
+      .then(data => setProfile(data))
+      .catch(() => {});
+  }, [setProfile]);
 
   const handleLogout = () => {
     clearAuth();
-    navigation.replace('Welcome');
+    // No manual navigation needed — the conditional navigator in AppNavigation
+    // automatically switches to the auth stack when isAuthenticated becomes false.
   };
 
   const getInitials = (name: string) => {

@@ -78,7 +78,17 @@ export default function OTPVerificationScreen({navigation, route}: any) {
       const {getVerificationStatus, getDriverProfile, getMyVehicles} =
         require('../services/driverService');
 
-      const statusData = await getVerificationStatus();
+      // If status fetch fails, use a safe fallback based on flow:
+      // login → already has an account → MainTabs; register → start onboarding
+      let statusData: {verification_status: string} | null = null;
+      try {
+        statusData = await getVerificationStatus();
+      } catch {
+        navigation.replace(
+          currentFlow === 'login' ? 'MainTabs' : 'KYCVehicleRegistration',
+        );
+        return;
+      }
 
       if (statusData.verification_status === 'APPROVED') {
         navigation.replace('MainTabs');
@@ -91,6 +101,7 @@ export default function OTPVerificationScreen({navigation, route}: any) {
         return;
       }
 
+      // login flow, not yet approved — check how far through onboarding they got
       let hasRequiredProfileData = false;
       let hasVehicle = false;
 
@@ -174,7 +185,8 @@ export default function OTPVerificationScreen({navigation, route}: any) {
       try {
         await resolvePostOtpRoute(flow);
       } catch {
-        navigation.replace('KYCVehicleRegistration');
+        // Unexpected error in route resolution — use safest fallback per flow
+        navigation.replace(flow === 'login' ? 'MainTabs' : 'KYCVehicleRegistration');
       }
     } catch (error) {
       const message = getApiErrorMessage(error);
