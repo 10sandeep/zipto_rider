@@ -45,7 +45,8 @@ export const ENDPOINTS = {
   ACCEPT_BOOKING: (bookingId: string) => `/booking/${bookingId}/accept`, // PUT - accept booking
   REJECT_BOOKING: (bookingId: string) => `/booking/${bookingId}/reject`, // PUT - reject booking
   START_TRIP: (bookingId: string) => `/booking/${bookingId}/start`,      // PUT - start trip
-  COMPLETE_TRIP: (bookingId: string) => `/booking/${bookingId}/complete`,// PUT - complete trip (toll, waiting)
+  COMPLETE_TRIP: (bookingId: string) => `/booking/${bookingId}/complete`, // PUT - complete trip
+  RESEND_DELIVERY_OTP: (bookingId: string) => `/booking/${bookingId}/resend-delivery-otp`, // POST
   AVAILABLE_BOOKINGS: '/booking/available',                              // GET - broadcast bookings near driver
   DRIVER_ACTIVE_BOOKING: '/booking/driver/active',                       // GET - driver's current active booking
   GET_BOOKING: (bookingId: string) => `/booking/${bookingId}`,           // GET - get booking by ID

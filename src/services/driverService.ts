@@ -505,13 +505,18 @@ export interface ActiveBooking {
   paid_by: 'sender' | 'receiver';
   is_already_paid: boolean;
   payments?: ActiveBookingPayment[];
+  // Sender (the person who placed the booking)
+  sender_name?: string;
+  sender_phone?: string;
+  // Receiver
+  receiver_name?: string;
+  receiver_phone?: string;
+  alternative_phone?: string;
   // OTPs
   pickup_otp?: string;
   pickup_otp_verified?: boolean;
   delivery_otp?: string;
-  receiver_name?: string;
-  receiver_phone?: string;
-  alternative_phone?: string;
+  delivery_otp_verified?: boolean;
 }
 
 export const getBookingById = async (bookingId: string): Promise<ActiveBooking | null> => {
@@ -562,6 +567,10 @@ export interface CompleteTripResult {
   };
   coins_earned?: number;
 }
+
+export const resendDeliveryOtp = async (bookingId: string): Promise<void> => {
+  await apiClient.post(ENDPOINTS.RESEND_DELIVERY_OTP(bookingId));
+};
 
 export const completeTrip = async (
   bookingId: string,

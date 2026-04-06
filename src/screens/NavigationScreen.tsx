@@ -16,18 +16,14 @@ import {
   Image,
   Linking,
 } from 'react-native';
-import MapView, {
-  PROVIDER_GOOGLE,
-  Marker,
-  Polyline,
-  Region,
-} from 'react-native-maps';
+import MapView, {PROVIDER_GOOGLE, Marker} from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {
   getDriverActiveBooking,
   startTrip,
   completeTrip,
+  resendDeliveryOtp,
   ActiveBooking,
   CompleteTripResult,
 } from '../services/driverService';
@@ -87,6 +83,11 @@ export default function NavigationScreen({route, navigation}: any) {
   // Trip summary modal
   const [summaryVisible, setSummaryVisible] = useState(false);
   const [tripResult, setTripResult] = useState<CompleteTripResult | null>(null);
+
+  // Resend delivery OTP
+  const [isResending, setIsResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const resendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Map state
   const mapRef = useRef<MapView>(null);
@@ -195,6 +196,59 @@ export default function NavigationScreen({route, navigation}: any) {
   useEffect(() => {
     fetchActiveBooking();
   }, [fetchActiveBooking]);
+
+  // Re-centre map on drop when step switches to delivering
+  useEffect(() => {
+    if (step === 'delivering' && dropCoords && mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          latitude: dropCoords.latitude,
+          longitude: dropCoords.longitude,
+          latitudeDelta: 0.03,
+          longitudeDelta: 0.03,
+        },
+        600,
+      );
+    }
+  }, [step, dropCoords]);
+
+  // Cleanup resend timer on unmount
+  useEffect(() => {
+    return () => {
+      if (resendTimerRef.current) clearInterval(resendTimerRef.current);
+    };
+  }, []);
+
+  const startResendCooldown = () => {
+    setResendCooldown(60);
+    if (resendTimerRef.current) clearInterval(resendTimerRef.current);
+    resendTimerRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(resendTimerRef.current!);
+          resendTimerRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleResendDeliveryOtp = async () => {
+    if (isResending || resendCooldown > 0 || booking?.delivery_otp_verified) return;
+    setIsResending(true);
+    try {
+      const activeId = booking?.id || bookingId;
+      await resendDeliveryOtp(activeId);
+      startResendCooldown();
+      Alert.alert('OTP Sent', `Delivery OTP resent to ${booking?.receiver_phone || booking?.sender_phone || 'receiver'}.`);
+    } catch (e: any) {
+      const msg: string = e?.response?.data?.message ?? 'Failed to resend OTP. Please try again.';
+      Alert.alert('Error', msg);
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   // ── Open pickup OTP modal ────────────────────────────────────
   const handlePickedUp = () => {
@@ -377,12 +431,10 @@ export default function NavigationScreen({route, navigation}: any) {
             style={styles.navigateBtn}
             onPress={openGoogleMapsNav}
             activeOpacity={0.8}>
-            <Ionicons
-              name="navigate"
-              size={moderateScale(20)}
-              color="#FFFFFF"
-            />
-            <Text style={styles.navigateBtnText}>Navigate</Text>
+            <Ionicons name="navigate" size={moderateScale(20)} color="#FFFFFF" />
+            <Text style={styles.navigateBtnText}>
+              {step === 'delivering' ? 'Navigate to Drop' : 'Navigate to Pickup'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -406,7 +458,7 @@ export default function NavigationScreen({route, navigation}: any) {
           />
         </View>
 
-        {/* Addresses + receiver info */}
+        {/* Addresses */}
         {booking ? (
           <View style={styles.addressCard}>
             <View style={styles.addressRow}>
@@ -428,26 +480,28 @@ export default function NavigationScreen({route, navigation}: any) {
                 </Text>
               </View>
             </View>
-            {booking.receiver_name ? (
-              <>
-                <View style={styles.addressDivider} />
-                <View style={styles.receiverRow}>
-                  <Ionicons
-                    name="person-outline"
-                    size={moderateScale(14)}
-                    color="#6B7280"
-                  />
-                  <Text style={styles.receiverText}>
-                    {booking.receiver_name}
-                    {booking.receiver_phone
-                      ? `  •  ${booking.receiver_phone}`
-                      : ''}
-                  </Text>
-                </View>
-              </>
-            ) : null}
           </View>
         ) : null}
+
+        {/* Contact cards — sender always shown; receiver shown during delivery */}
+        {booking && (
+          <View style={styles.contactsRow}>
+            <ContactCard
+              label="Sender"
+              name={booking.sender_name}
+              phone={booking.sender_phone}
+              color="#3B82F6"
+            />
+            {step === 'delivering' && booking.receiver_name && (
+              <ContactCard
+                label="Receiver"
+                name={booking.receiver_name}
+                phone={booking.receiver_phone ?? booking.alternative_phone}
+                color="#10B981"
+              />
+            )}
+          </View>
+        )}
 
         {/* Paid By badge */}
         {booking && (
@@ -914,17 +968,49 @@ export default function NavigationScreen({route, navigation}: any) {
                     </Text>
                   </View>
 
+                  {/* OTP sent notice */}
+                  <View style={styles.otpSentBox}>
+                    <Ionicons name="phone-portrait-outline" size={moderateScale(22)} color="#10B981" />
+                    <View style={{flex: 1}}>
+                      <Text style={styles.otpSentTitle}>OTP sent to receiver via SMS</Text>
+                      <Text style={styles.otpSentSub}>
+                        {booking?.receiver_phone || booking?.sender_phone
+                          ? `Sent to ${booking?.receiver_phone || booking?.sender_phone}`
+                          : 'Receiver was sent the OTP when package was picked up'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Resend button */}
+                  {!booking?.delivery_otp_verified && (
+                    <TouchableOpacity
+                      style={[
+                        styles.resendOtpBtn,
+                        (isResending || resendCooldown > 0) && styles.resendOtpBtnDisabled,
+                      ]}
+                      onPress={handleResendDeliveryOtp}
+                      disabled={isResending || resendCooldown > 0}
+                      activeOpacity={0.8}>
+                      {isResending ? (
+                        <ActivityIndicator color="#10B981" size="small" />
+                      ) : (
+                        <Ionicons name="refresh" size={moderateScale(15)} color={resendCooldown > 0 ? '#9CA3AF' : '#10B981'} />
+                      )}
+                      <Text style={[styles.resendOtpBtnText, resendCooldown > 0 && {color: '#9CA3AF'}]}>
+                        {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP to Receiver'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
                   {/* OTP entry */}
                   <Text style={styles.otpLabel}>Delivery OTP</Text>
                   <Text style={styles.otpHint}>
-                    Ask the sender for the 6-digit OTP sent to their phone
+                    Ask the receiver to share the 6-digit OTP
                   </Text>
                   <TextInput
                     style={styles.otpInput}
                     value={otpInput}
-                    onChangeText={v =>
-                      setOtpInput(v.replace(/\D/g, '').slice(0, 6))
-                    }
+                    onChangeText={v => setOtpInput(v.replace(/\D/g, '').slice(0, 6))}
                     keyboardType="number-pad"
                     maxLength={6}
                     placeholder="• • • • • •"
@@ -941,19 +1027,14 @@ export default function NavigationScreen({route, navigation}: any) {
                       <Text style={styles.cancelModalBtnText}>Back</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[
-                        styles.confirmBtn,
-                        completing && styles.confirmBtnDisabled,
-                      ]}
+                      style={[styles.confirmBtn, completing && styles.confirmBtnDisabled]}
                       onPress={handleConfirmComplete}
                       disabled={completing}
                       activeOpacity={0.8}>
                       {completing ? (
                         <ActivityIndicator color="#FFFFFF" />
                       ) : (
-                        <Text style={styles.confirmBtnText}>
-                          Confirm Delivery
-                        </Text>
+                        <Text style={styles.confirmBtnText}>Confirm Delivery</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -1118,6 +1199,36 @@ function SummaryRow({
         ]}>
         {value}
       </Text>
+    </View>
+  );
+}
+
+function ContactCard({
+  label,
+  name,
+  phone,
+  color,
+}: {
+  label: string;
+  name?: string;
+  phone?: string;
+  color: string;
+}) {
+  const handleCall = () => {
+    if (phone) {
+      Linking.openURL(`tel:${phone}`);
+    }
+  };
+
+  return (
+    <View style={[styles.contactCard, {borderLeftColor: color}]}>
+      <Text style={[styles.contactLabel, {color}]}>{label}</Text>
+      <Text style={styles.contactName}>{name ?? '—'}</Text>
+      {phone ? (
+        <TouchableOpacity style={styles.contactCallBtn} onPress={handleCall}>
+          <Text style={styles.contactCallText}>📞 {phone}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -1776,5 +1887,85 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(16),
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+
+  // Contact cards
+  contactsRow: {
+    flexDirection: 'row',
+    gap: scale(8),
+    marginBottom: verticalScale(10),
+  },
+  contactCard: {
+    flex: 1,
+    borderRadius: moderateScale(12),
+    padding: scale(10),
+    borderWidth: 1.5,
+  },
+  contactLabel: {
+    fontSize: moderateScale(9),
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: verticalScale(3),
+  },
+  contactName: {
+    fontSize: moderateScale(13),
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginBottom: verticalScale(6),
+  },
+  contactCallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(4),
+    paddingVertical: verticalScale(5),
+    paddingHorizontal: scale(10),
+    borderRadius: moderateScale(8),
+    alignSelf: 'flex-start',
+  },
+  contactCallText: {
+    fontSize: moderateScale(12),
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  // OTP sent info box
+  otpSentBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: scale(10),
+    backgroundColor: '#F0FDF4',
+    borderRadius: moderateScale(12),
+    padding: scale(12),
+    marginBottom: verticalScale(12),
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  otpSentTitle: {
+    fontSize: moderateScale(13),
+    fontWeight: '700',
+    color: '#15803D',
+    marginBottom: 2,
+  },
+  otpSentSub: {fontSize: moderateScale(11), color: '#4ADE80'},
+
+  // Resend button
+  resendOtpBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(6),
+    alignSelf: 'center',
+    paddingVertical: verticalScale(8),
+    paddingHorizontal: scale(16),
+    borderRadius: moderateScale(20),
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    marginBottom: verticalScale(16),
+  },
+  resendOtpBtnDisabled: {borderColor: '#D1D5DB'},
+  resendOtpBtnText: {
+    fontSize: moderateScale(13),
+    fontWeight: '700',
+    color: '#10B981',
   },
 });
