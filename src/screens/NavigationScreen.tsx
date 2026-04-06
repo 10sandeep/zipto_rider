@@ -97,24 +97,23 @@ export default function NavigationScreen({route, navigation}: any) {
 
   // Track driver's current location
   useEffect(() => {
-    Geolocation.getCurrentPosition(
-      pos =>
-        setDriverLocation({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        }),
-      () => {},
-      {enableHighAccuracy: false, timeout: 10000, maximumAge: 30000},
-    );
-    const watchId = Geolocation.watchPosition(
-      pos =>
-        setDriverLocation({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        }),
-      () => {},
-      {enableHighAccuracy: true, distanceFilter: 20, interval: 5000},
-    );
+    const applyPosition = (pos: any) => {
+      const lat = pos?.coords?.latitude;
+      const lng = pos?.coords?.longitude;
+      if (typeof lat === 'number' && typeof lng === 'number' && isFinite(lat) && isFinite(lng)) {
+        setDriverLocation({latitude: lat, longitude: lng});
+      }
+    };
+    Geolocation.getCurrentPosition(applyPosition, () => {}, {
+      enableHighAccuracy: false,
+      timeout: 10000,
+      maximumAge: 30000,
+    });
+    const watchId = Geolocation.watchPosition(applyPosition, () => {}, {
+      enableHighAccuracy: true,
+      distanceFilter: 20,
+      interval: 5000,
+    });
     return () => Geolocation.clearWatch(watchId);
   }, []);
 
@@ -122,12 +121,15 @@ export default function NavigationScreen({route, navigation}: any) {
   const getCoords = (
     geo: any,
   ): {latitude: number; longitude: number} | null => {
-    if (!geo) {
-      return null;
-    }
+    if (!geo) return null;
     const coords = geo.coordinates || geo;
     if (Array.isArray(coords) && coords.length >= 2) {
-      return {latitude: coords[1], longitude: coords[0]};
+      const lng = coords[0];
+      const lat = coords[1];
+      // Guard against null/NaN — passing null Double to native Maps crashes Android
+      if (typeof lat === 'number' && typeof lng === 'number' && isFinite(lat) && isFinite(lng)) {
+        return {latitude: lat, longitude: lng};
+      }
     }
     return null;
   };

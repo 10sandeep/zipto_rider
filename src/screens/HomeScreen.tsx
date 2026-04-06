@@ -242,9 +242,9 @@ export default function HomeScreen({ navigation }: any) {
       ]);
       setProfile(data);
 
-      // Always force offline when home screen loads
-      setIsOnline(false);
-      await updateAvailability({ availability_status: 'offline' });
+      // Restore the driver's last-known availability status from the server
+      const isCurrentlyOnline = data.availability_status === 'online';
+      setIsOnline(isCurrentlyOnline);
 
       const approved = vehicles.some(
         v => v.verification_status?.toUpperCase() === 'APPROVED',
@@ -306,7 +306,10 @@ export default function HomeScreen({ navigation }: any) {
     // Get location name on mount
     Geolocation.getCurrentPosition(
       async pos => {
-        const name = await reverseGeocodeCoords(pos.coords.latitude, pos.coords.longitude);
+        const lat = pos?.coords?.latitude;
+        const lng = pos?.coords?.longitude;
+        if (typeof lat !== 'number' || typeof lng !== 'number' || !isFinite(lat) || !isFinite(lng)) return;
+        const name = await reverseGeocodeCoords(lat, lng);
         if (name) { setLocationName(name); }
       },
       () => { },
@@ -461,6 +464,12 @@ export default function HomeScreen({ navigation }: any) {
           <View style={styles.headerLeft}>
             <Text style={styles.greeting}>Hello, {firstName}! 👋</Text>
             <Text style={styles.date}>{currentDate}</Text>
+            {locationName && (
+              <View style={styles.locationRow}>
+                <Ionicons name="location-sharp" size={moderateScale(12)} color="rgba(255,255,255,0.75)" />
+                <Text style={styles.locationText}>{locationName}</Text>
+              </View>
+            )}
           </View>
 
           {/* Notification bell */}
@@ -573,6 +582,24 @@ export default function HomeScreen({ navigation }: any) {
               ₹{dailyStats.today_earnings}
             </Text>
             <Text style={styles.statLabel}>Earnings</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={styles.statDivider} />
+
+          {/* Attendance */}
+          <View style={styles.statCard}>
+            <View style={[styles.statIconWrap, { backgroundColor: C.amberLight }]}>
+              <Ionicons
+                name="calendar-outline"
+                size={moderateScale(22)}
+                color={C.amberDark}
+              />
+            </View>
+            <Text style={[styles.statValue, { color: C.amber }]}>
+              {attendanceSummary.days_present}/{attendanceSummary.total_days}
+            </Text>
+            <Text style={styles.statLabel}>Attendance</Text>
           </View>
         </View>
 
@@ -929,7 +956,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
+  // ── Stats ────────────────────────────────────────────────���────────────────
   statsContainer: {
     flexDirection: 'row',
     marginHorizontal: scale(20),
