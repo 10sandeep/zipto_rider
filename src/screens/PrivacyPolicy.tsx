@@ -122,7 +122,7 @@ const CONTACT_INFO = [
   {
     icon: 'location-outline',
     label: 'Visit Us',
-    value: 'Plot No-781, Maharishi College Rd, in front of DN Kingsland, Saheed Nagar, Bhubaneswar, Odisha 751007',
+    value: 'Bhubaneswar, Odisha 751007',
     action: () => Linking.openURL('https://maps.google.com/?q=Plot+No-781+Maharishi+College+Rd+Saheed+Nagar+Bhubaneswar+Odisha+751007'),
     iconBg: '#FEF3C7',
     iconColor: '#92400E',

@@ -134,7 +134,7 @@ const CONTACT_DETAILS = [
   {
     icon: 'call-outline',
     label: 'Call Us',
-    value: '+91 9090029996',
+    value: '+91 90900 29996',
     iconBg: '#D1FAE5',
     iconColor: '#065F46',
     onPress: () => Linking.openURL('tel:+91 9090029996'),
@@ -142,7 +142,7 @@ const CONTACT_DETAILS = [
   {
     icon: 'location-outline',
     label: 'Our Address',
-    value: 'Plot No-781, Maharishi College Rd, in front of DN Kingsland, Saheed Nagar, Bhubaneswar, Odisha 751007',
+    value: 'Bhubaneswar, Odisha 751007',
     iconBg: '#EDE9FE',
     iconColor: '#5B21B6',
     onPress: () =>

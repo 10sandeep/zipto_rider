@@ -150,12 +150,12 @@ const CONTACT_DETAILS = [
     icon: 'location-outline',
     label: 'Office Address',
     value:
-      'Plot No-781, Maharishi College Rd,\nin front of DN Kingsland, Saheed Nagar,\nBhubaneswar, Odisha 751007',
+      'Saheed Nagar,\nBhubaneswar, Odisha 751007',
     iconBg: '#FEF3C7',
     iconColor: '#92400E',
     onPress: () =>
       Linking.openURL(
-        'https://maps.google.com/?q=Plot+No-781,+Maharishi+College+Rd,+Saheed+Nagar,+Bhubaneswar,+Odisha+751007',
+        'https://maps.google.com/?q=Saheed+Nagar,+Bhubaneswar,+Odisha+751007',
       ),
   },
 ];
@@ -206,7 +206,7 @@ export default function AboutUsScreen({navigation}: any) {
 
           <View style={styles.statusPill}>
             <View style={styles.greenDot} />
-            <Text style={styles.statusText}>Delivery made simple & fast</Text>
+            <Text style={styles.statusText}>Earn more with flexible delivery – anytime, anywhere.</Text>
           </View>
         </View>
 
@@ -231,8 +231,7 @@ export default function AboutUsScreen({navigation}: any) {
             <View style={{flex: 1}}>
               <Text style={styles.summaryTitle}>Fast-Growing Platform</Text>
               <Text style={styles.summarySub}>
-                Zipto connects riders with flexible earning opportunities,
-                making delivery simple and accessible for everyone.
+               Zipto is built for riders who want flexible income opportunities with full control over their time and earnings.
               </Text>
             </View>
           </View>
@@ -254,8 +253,7 @@ export default function AboutUsScreen({navigation}: any) {
             </View>
           </View>
           <Text style={styles.missionText}>
-            "To make delivery simple, fast, and accessible for everyone while
-            helping riders earn better."
+            "Empowering riders to earn better with flexibility, transparency, and reliable opportunities."
           </Text>
         </View>
 

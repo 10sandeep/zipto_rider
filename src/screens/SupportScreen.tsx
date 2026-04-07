@@ -115,7 +115,7 @@ export default function SupportScreen({ navigation }: any) {
           {/* Status pill */}
           <View style={styles.statusPill}>
             <View style={styles.greenDot} />
-            <Text style={styles.statusText}>Available 24 × 7  ·  Avg. response &lt; 5 min</Text>
+            <Text style={styles.statusText}>Usually responds within minutes.</Text>
           </View>
         </View>
 

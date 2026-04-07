@@ -373,7 +373,7 @@ export default function ConductScreen({ navigation }: any) {
             style={[styles.menuItem, styles.menuItemLast]}
             onPress={() =>
               handleMaps(
-                'Plot No-781, Maharishi College Rd, Saheed Nagar, Bhubaneswar, Odisha 751007',
+                'Bhubaneswar, Odisha 751007',
               )
             }
             activeOpacity={0.7}
