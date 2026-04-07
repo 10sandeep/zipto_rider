@@ -176,7 +176,7 @@ export default function TermsScreen({ navigation }: any) {
             <Ionicons name="information-circle-outline" size={moderateScale(20)} color={C.primary} />
           </View>
           <Text style={styles.noticeText}>
-            Please read all sections carefully before accepting. By tapping "I Agree" you enter into a binding agreement with Zipto.
+            Welcome to zipto, Zipto is operated by (Zipto Hyperlogistics Pvt. Ltd).Please read all sections carefully before accepting. By tapping "I Agree" you enter into a binding agreement with Zipto.
           </Text>
         </View>
 

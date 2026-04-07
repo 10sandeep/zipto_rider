@@ -59,11 +59,12 @@ const MENU_SECTIONS = [
   {
     title: 'HELP & COMPLIANCE',
     items: [
-      {icon: 'shield-checkmark-outline', label: 'Privacy Policy',      route: 'PrivacyPolicy'},
-      {icon: 'document-text-outline',    label: 'Terms & Conditions',  route: 'TermsCondition'},   // ← fixed
-      {icon: 'clipboard-outline',        label: 'Conduct Policy',      route: 'ConductPolicy'},
-      {icon: 'close-circle-outline',     label: 'Cancellation Policy', route: 'CancellationPolicy'},
-      {icon: 'card-outline',             label: 'Payment Policy',      route: 'PaymentPolicy'},
+      {icon: 'help-circle-outline',         label: 'FAQ',                route: 'FAQ'},
+      {icon: 'shield-checkmark-outline',    label: 'Privacy Policy',     route: 'PrivacyPolicy'},
+      {icon: 'document-text-outline',       label: 'Terms & Conditions', route: 'TermsCondition'},
+      {icon: 'clipboard-outline',           label: 'Conduct Policy',     route: 'ConductPolicy'},
+      {icon: 'close-circle-outline',        label: 'Cancellation Policy',route: 'CancellationPolicy'},
+      {icon: 'card-outline',                label: 'Payment Policy',     route: 'PaymentPolicy'},
     ],
   },
 ];

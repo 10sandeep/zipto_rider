@@ -150,7 +150,7 @@ const CONTACT_DETAILS = [
     icon: 'location-outline',
     label: 'Office Address',
     value:
-      'Saheed Nagar,\nBhubaneswar, Odisha 751007',
+      'Bhubaneswar, Odisha 751007',
     iconBg: '#FEF3C7',
     iconColor: '#92400E',
     onPress: () =>
@@ -209,7 +209,14 @@ export default function AboutUsScreen({navigation}: any) {
             <Text style={styles.statusText}>Earn more with flexible delivery – anytime, anywhere.</Text>
           </View>
         </View>
-
+<View style={styles.noticeCard}>
+          <View style={styles.noticeIconWrap}>
+            <Ionicons name="information-circle-outline" size={moderateScale(20)} color={C.primary} />
+          </View>
+          <Text style={styles.noticeText}>
+            Welcome to zipto, Zipto is operated by (Zipto Hyperlogistics Pvt. Ltd).Please read all sections carefully before accepting. By tapping "I Agree" you enter into a binding agreement with Zipto.
+          </Text>
+        </View>
         {/* ── About Zipto Banner ───────────────────────────────────────── */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>WHO WE ARE</Text>
@@ -501,6 +508,18 @@ const styles = StyleSheet.create({
     color: C.white,
     marginBottom: verticalScale(12),
     letterSpacing: -0.3,
+  },
+  noticeCard: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    marginHorizontal: scale(20), marginTop: verticalScale(16),
+    backgroundColor: C.primaryLight, borderRadius: moderateScale(12),
+    borderWidth: 1, borderColor: '#BFCFFF',
+    padding: scale(14), gap: scale(10),
+  },
+    noticeIconWrap: { marginTop: verticalScale(1) },
+  noticeText: {
+    flex: 1, fontSize: moderateScale(13), color: '#1E3A8A',
+    lineHeight: moderateScale(19), fontWeight: '500',
   },
   statusPill: {
     flexDirection: 'row',

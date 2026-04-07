@@ -205,7 +205,14 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
           <Ionicons name="time-outline" size={moderateScale(13)} color={C.textMuted} />
           <Text style={styles.updateNoteText}>Last updated: April 1, 2025</Text>
         </View>
-
+ <View style={styles.noticeCard}>
+          <View style={styles.noticeIconWrap}>
+            <Ionicons name="information-circle-outline" size={moderateScale(20)} color={C.primary} />
+          </View>
+          <Text style={styles.noticeText}>
+            Welcome to zipto, Zipto is operated by (Zipto Hyperlogistics Pvt. Ltd).Please read all sections carefully before accepting. By tapping "I Agree" you enter into a binding agreement with Zipto.
+          </Text>
+        </View>
         {/* ── Data Collected ───────────────────────────────────────────── */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>INFORMATION WE COLLECT</Text>
@@ -441,6 +448,18 @@ const styles = StyleSheet.create({
     color: C.white,
     marginBottom: verticalScale(12),
     letterSpacing: -0.3,
+  },
+    noticeCard: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    marginHorizontal: scale(20), marginTop: verticalScale(16),
+    backgroundColor: C.primaryLight, borderRadius: moderateScale(12),
+    borderWidth: 1, borderColor: '#BFCFFF',
+    padding: scale(14), gap: scale(10),
+  },
+    noticeIconWrap: { marginTop: verticalScale(1) },
+  noticeText: {
+    flex: 1, fontSize: moderateScale(13), color: '#1E3A8A',
+    lineHeight: moderateScale(19), fontWeight: '500',
   },
   statusPill: {
     flexDirection: 'row',

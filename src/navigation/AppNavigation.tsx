@@ -41,6 +41,9 @@ import PaymentsScreen from '../screens/PaymentPolicy';
 import TermsConditionScreen from '../screens/TermsCondition';
 import AboutUsScreen from '../screens/AboutUs';
 
+// Import FAQ Screen
+import FAQScreen from '../screens/FAQs';
+
 // Type definitions for Stack Navigator
 export type RootStackParamList = {
   // Auth & Onboarding
@@ -80,6 +83,9 @@ export type RootStackParamList = {
   PaymentPolicy: undefined;
   TermsCondition: undefined;
   AboutUs: undefined;
+
+  // Help
+  FAQ: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -188,6 +194,9 @@ export default function AppNavigation() {
               component={TermsConditionScreen}
             />
             <Stack.Screen name="AboutUs" component={AboutUsScreen} />
+
+            {/* Help */}
+            <Stack.Screen name="FAQ" component={FAQScreen} />
           </>
         )}
       </Stack.Navigator>
@@ -211,6 +220,7 @@ export default function AppNavigation() {
  *    ├── From Home → OrderDetails → Navigation
  *    ├── From Profile → Settings, VehicleDetails, BankDetails, etc.
  *    ├── From Profile → PrivacyPolicy, ConductPolicy, CancellationPolicy, PaymentPolicy
+ *    ├── From Profile → FAQ
  *    └── Global Access → Notifications, Support
  *
  * ==================== NOTES ====================

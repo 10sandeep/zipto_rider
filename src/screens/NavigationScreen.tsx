@@ -15,6 +15,8 @@ import {
   KeyboardAvoidingView,
   Image,
   Linking,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import MapView, {PROVIDER_GOOGLE, Marker} from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
@@ -32,7 +34,6 @@ const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 const scale = (s: number) => (SCREEN_WIDTH / 375) * s;
 const verticalScale = (s: number) => (SCREEN_HEIGHT / 812) * s;
 const moderateScale = (s: number, f = 0.5) => s + (scale(s) - s) * f;
-
 const fmt = (n: number) =>
   '₹' +
   Number(n).toLocaleString('en-IN', {
@@ -42,12 +43,9 @@ const fmt = (n: number) =>
 
 type TripStep = 'going_to_pickup' | 'delivering';
 type PaymentChoice = 'cash' | 'online' | null;
-/** Steps inside the delivery modal */
 type DeliveryStep = 'payment' | 'otp';
 
-// QR code for UPI payment — rendered via free public API (no extra package needed)
 const buildUpiUrl = (amount: number, bookingId: string) =>
-  // Replace with your actual company UPI ID / merchant UPI
   `upi://pay?pa=zipto@upi&pn=Zipto%20Delivery&am=${amount.toFixed(
     2,
   )}&cu=INR&tn=Booking%20${bookingId.slice(-6).toUpperCase()}`;
@@ -57,9 +55,307 @@ const buildQrImageUrl = (upiUrl: string) =>
     upiUrl,
   )}`;
 
+// ── Slide To Confirm Component ─────────────────────────────────────────────
+const THUMB_SIZE = moderateScale(52);
+const SLIDE_THRESHOLD = 0.82;
+
+function SlideToConfirm({
+  label,
+  onSlideComplete,
+  color = '#16A34A',
+  disabled = false,
+  loading = false,
+  icon = 'chevron-forward',
+}: {
+  label: string;
+  onSlideComplete: () => void;
+  color?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  icon?: string;
+}) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const sliderWidth = useRef(0);
+  const hasTriggered = useRef(false);
+
+  // Animated opacity for the label text (fades as thumb moves right)
+  const labelOpacity = translateX.interpolate({
+    inputRange: [0, 80],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  // Animated opacity for the trail fill
+  const fillWidth = translateX.interpolate({
+    inputRange: [0, 300],
+    outputRange: [THUMB_SIZE, 300 + THUMB_SIZE],
+    extrapolate: 'clamp',
+  });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !disabled && !loading,
+      onMoveShouldSetPanResponder: () => !disabled && !loading,
+      onPanResponderGrant: () => {
+        hasTriggered.current = false;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (hasTriggered.current) return;
+        const maxX = sliderWidth.current - THUMB_SIZE;
+        const newX = Math.max(0, Math.min(gestureState.dx, maxX));
+        translateX.setValue(newX);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (hasTriggered.current) return;
+        const maxX = sliderWidth.current - THUMB_SIZE;
+        if (gestureState.dx >= maxX * SLIDE_THRESHOLD) {
+          hasTriggered.current = true;
+          Animated.spring(translateX, {
+            toValue: maxX,
+            useNativeDriver: false,
+            tension: 60,
+            friction: 8,
+          }).start(() => {
+            onSlideComplete();
+            // Reset after a brief pause so it feels responsive
+            setTimeout(() => {
+              Animated.spring(translateX, {
+                toValue: 0,
+                useNativeDriver: false,
+                tension: 60,
+                friction: 8,
+              }).start(() => {
+                hasTriggered.current = false;
+              });
+            }, 300);
+          });
+        } else {
+          // Snap back
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: false,
+            tension: 80,
+            friction: 8,
+          }).start();
+        }
+      },
+    }),
+  ).current;
+
+  const trackBg = disabled || loading ? '#D1D5DB' : '#E8F5E9';
+  const thumbBg = disabled || loading ? '#9CA3AF' : color;
+
+  return (
+    <View
+      style={[sliderStyles.track, {backgroundColor: trackBg}]}
+      onLayout={e => {
+        sliderWidth.current = e.nativeEvent.layout.width;
+      }}>
+      {/* Animated fill behind the thumb */}
+      <Animated.View
+        style={[
+          sliderStyles.fill,
+          {
+            width: fillWidth,
+            backgroundColor: disabled || loading ? '#D1D5DB' : color + '28',
+          },
+        ]}
+      />
+
+      {/* Label text */}
+      <Animated.Text style={[sliderStyles.trackLabel, {opacity: labelOpacity}]}>
+        {label}
+      </Animated.Text>
+
+      {/* Chevrons hint */}
+      <Animated.View
+        style={[sliderStyles.chevronHint, {opacity: labelOpacity}]}>
+        <Ionicons
+          name="chevron-forward"
+          size={moderateScale(14)}
+          color={disabled ? '#9CA3AF' : color + '80'}
+        />
+        <Ionicons
+          name="chevron-forward"
+          size={moderateScale(14)}
+          color={disabled ? '#9CA3AF' : color + '50'}
+        />
+      </Animated.View>
+
+      {/* Draggable Thumb */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          sliderStyles.thumb,
+          {
+            backgroundColor: thumbBg,
+            transform: [{translateX}],
+          },
+        ]}>
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <Ionicons
+            name={icon as any}
+            size={moderateScale(22)}
+            color="#FFFFFF"
+          />
+        )}
+      </Animated.View>
+    </View>
+  );
+}
+
+const sliderStyles = StyleSheet.create({
+  track: {
+    height: moderateScale(60),
+    borderRadius: moderateScale(30),
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  fill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: moderateScale(30),
+  },
+  trackLabel: {
+    fontSize: moderateScale(14),
+    fontWeight: '700',
+    color: '#374151',
+    letterSpacing: 0.3,
+    textAlign: 'center',
+    paddingHorizontal: THUMB_SIZE + scale(8),
+  },
+  chevronHint: {
+    position: 'absolute',
+    right: scale(18),
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  thumb: {
+    position: 'absolute',
+    left: moderateScale(4),
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: THUMB_SIZE / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+  },
+});
+
+// ── OTP Box Input Component ────────────────────────────────────────────────
+const OTP_LENGTH = 6;
+
+function OtpBoxInput({
+  value,
+  onChange,
+  autoFocus = false,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  autoFocus?: boolean;
+}) {
+  const inputs = useRef<Array<TextInput | null>>([]);
+
+  const handleChange = (text: string, index: number) => {
+    const digit = text.replace(/\D/g, '').slice(-1);
+    const newVal = value.split('');
+    newVal[index] = digit;
+    const joined = newVal.join('').slice(0, OTP_LENGTH);
+    onChange(joined);
+    if (digit && index < OTP_LENGTH - 1) {
+      inputs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === 'Backspace') {
+      if (!value[index] && index > 0) {
+        const newVal = value.split('');
+        newVal[index - 1] = '';
+        onChange(newVal.join(''));
+        inputs.current[index - 1]?.focus();
+      } else {
+        const newVal = value.split('');
+        newVal[index] = '';
+        onChange(newVal.join(''));
+      }
+    }
+  };
+
+  const handleChangeText = (text: string, index: number) => {
+    if (text.length > 1) {
+      const digits = text.replace(/\D/g, '').slice(0, OTP_LENGTH);
+      onChange(digits);
+      const lastIndex = Math.min(digits.length, OTP_LENGTH - 1);
+      inputs.current[lastIndex]?.focus();
+    } else {
+      handleChange(text, index);
+    }
+  };
+
+  return (
+    <View style={otpBoxStyles.row}>
+      {Array.from({length: OTP_LENGTH}).map((_, i) => (
+        <TextInput
+          key={i}
+          ref={ref => {
+            inputs.current[i] = ref;
+          }}
+          style={[otpBoxStyles.box, value[i] ? otpBoxStyles.boxFilled : null]}
+          value={value[i] || ''}
+          onChangeText={text => handleChangeText(text, i)}
+          onKeyPress={e => handleKeyPress(e, i)}
+          keyboardType="number-pad"
+          maxLength={OTP_LENGTH}
+          autoFocus={autoFocus && i === 0}
+          selectTextOnFocus
+          caretHidden
+          textContentType="oneTimeCode"
+        />
+      ))}
+    </View>
+  );
+}
+
+const otpBoxStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: scale(8),
+    marginBottom: verticalScale(20),
+  },
+  box: {
+    flex: 1,
+    aspectRatio: 1,
+    maxWidth: moderateScale(52),
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderRadius: moderateScale(12),
+    fontSize: moderateScale(22),
+    fontWeight: '800',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    backgroundColor: '#F8FAFF',
+  },
+  boxFilled: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#EFF6FF',
+  },
+});
+
+// ── Main Screen ────────────────────────────────────────────────────────────
 export default function NavigationScreen({route, navigation}: any) {
   const bookingId: string = route.params?.bookingId ?? '';
-
   const [booking, setBooking] = useState<ActiveBooking | null>(null);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<TripStep>('going_to_pickup');
@@ -101,7 +397,12 @@ export default function NavigationScreen({route, navigation}: any) {
     const applyPosition = (pos: any) => {
       const lat = pos?.coords?.latitude;
       const lng = pos?.coords?.longitude;
-      if (typeof lat === 'number' && typeof lng === 'number' && isFinite(lat) && isFinite(lng)) {
+      if (
+        typeof lat === 'number' &&
+        typeof lng === 'number' &&
+        isFinite(lat) &&
+        isFinite(lng)
+      ) {
         setDriverLocation({latitude: lat, longitude: lng});
       }
     };
@@ -118,7 +419,6 @@ export default function NavigationScreen({route, navigation}: any) {
     return () => Geolocation.clearWatch(watchId);
   }, []);
 
-  // Extract lat/lng from PostGIS GeoJSON: { type: 'Point', coordinates: [lng, lat] }
   const getCoords = (
     geo: any,
   ): {latitude: number; longitude: number} | null => {
@@ -127,8 +427,12 @@ export default function NavigationScreen({route, navigation}: any) {
     if (Array.isArray(coords) && coords.length >= 2) {
       const lng = coords[0];
       const lat = coords[1];
-      // Guard against null/NaN — passing null Double to native Maps crashes Android
-      if (typeof lat === 'number' && typeof lng === 'number' && isFinite(lat) && isFinite(lng)) {
+      if (
+        typeof lat === 'number' &&
+        typeof lng === 'number' &&
+        isFinite(lat) &&
+        isFinite(lng)
+      ) {
         return {latitude: lat, longitude: lng};
       }
     }
@@ -140,16 +444,11 @@ export default function NavigationScreen({route, navigation}: any) {
   const destination =
     step === 'going_to_pickup' ? pickupCoords : dropCoords || pickupCoords;
 
-  // Fit map to show driver + destination — throttled to max once per 5s
   const lastFitRef = useRef(0);
   useEffect(() => {
-    if (!mapRef.current || !driverLocation || !destination) {
-      return;
-    }
+    if (!mapRef.current || !driverLocation || !destination) return;
     const now = Date.now();
-    if (now - lastFitRef.current < 5000) {
-      return;
-    }
+    if (now - lastFitRef.current < 5000) return;
     lastFitRef.current = now;
     mapRef.current.fitToCoordinates([driverLocation, destination], {
       edgePadding: {top: 100, right: 60, bottom: 350, left: 60},
@@ -157,18 +456,14 @@ export default function NavigationScreen({route, navigation}: any) {
     });
   }, [driverLocation, destination]);
 
-  // Open Google Maps for turn-by-turn navigation
   const openGoogleMapsNav = () => {
-    if (!destination) {
-      return;
-    }
+    if (!destination) return;
     const url = Platform.select({
       ios: `maps://app?daddr=${destination.latitude},${destination.longitude}&dirflg=d`,
       android: `google.navigation:q=${destination.latitude},${destination.longitude}&mode=d`,
     });
     if (url) {
       Linking.openURL(url).catch(() => {
-        // Fallback to web Google Maps
         Linking.openURL(
           `https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}&travelmode=driving`,
         );
@@ -182,9 +477,7 @@ export default function NavigationScreen({route, navigation}: any) {
       const data = await getDriverActiveBooking();
       if (data) {
         setBooking(data);
-        if (data.status === 'ongoing') {
-          setStep('delivering');
-        }
+        if (data.status === 'ongoing') setStep('delivering');
       }
     } catch {
       // ignore
@@ -197,7 +490,6 @@ export default function NavigationScreen({route, navigation}: any) {
     fetchActiveBooking();
   }, [fetchActiveBooking]);
 
-  // Re-centre map on drop when step switches to delivering
   useEffect(() => {
     if (step === 'delivering' && dropCoords && mapRef.current) {
       mapRef.current.animateToRegion(
@@ -212,7 +504,6 @@ export default function NavigationScreen({route, navigation}: any) {
     }
   }, [step, dropCoords]);
 
-  // Cleanup resend timer on unmount
   useEffect(() => {
     return () => {
       if (resendTimerRef.current) clearInterval(resendTimerRef.current);
@@ -235,35 +526,36 @@ export default function NavigationScreen({route, navigation}: any) {
   };
 
   const handleResendDeliveryOtp = async () => {
-    if (isResending || resendCooldown > 0 || booking?.delivery_otp_verified) return;
+    if (isResending || resendCooldown > 0 || booking?.delivery_otp_verified)
+      return;
     setIsResending(true);
     try {
       const activeId = booking?.id || bookingId;
       await resendDeliveryOtp(activeId);
       startResendCooldown();
-      Alert.alert('OTP Sent', `Delivery OTP resent to ${booking?.receiver_phone || booking?.sender_phone || 'receiver'}.`);
+      Alert.alert(
+        'OTP Sent',
+        `Delivery OTP resent to ${
+          booking?.receiver_phone || booking?.sender_phone || 'receiver'
+        }.`,
+      );
     } catch (e: any) {
-      const msg: string = e?.response?.data?.message ?? 'Failed to resend OTP. Please try again.';
+      const msg: string =
+        e?.response?.data?.message ?? 'Failed to resend OTP. Please try again.';
       Alert.alert('Error', msg);
     } finally {
       setIsResending(false);
     }
   };
 
-  // ── Open pickup OTP modal ────────────────────────────────────
   const handlePickedUp = () => {
-    if (!bookingId || starting) {
-      return;
-    }
+    if (!bookingId || starting) return;
     setPickupOtpInput('');
     setPickupOtpModalVisible(true);
   };
 
-  // ── Confirm pickup OTP + start trip ─────────────────────────
   const handleConfirmPickup = async () => {
-    if (!bookingId || starting) {
-      return;
-    }
+    if (!bookingId || starting) return;
     if (!pickupOtpInput.trim() || pickupOtpInput.trim().length !== 6) {
       Alert.alert(
         'Enter OTP',
@@ -272,7 +564,6 @@ export default function NavigationScreen({route, navigation}: any) {
       return;
     }
     setStarting(true);
-    // Prefer the real DB booking ID fetched from active booking endpoint
     const activeId = booking?.id || bookingId;
     try {
       await startTrip(activeId, pickupOtpInput.trim());
@@ -288,7 +579,6 @@ export default function NavigationScreen({route, navigation}: any) {
     }
   };
 
-  // ── Open the delivery completion modal ───────────────────────
   const openDeliveryModal = () => {
     setDeliveryStep('payment');
     setPaymentChoice(null);
@@ -298,7 +588,6 @@ export default function NavigationScreen({route, navigation}: any) {
     setDeliveryModalVisible(true);
   };
 
-  // ── Proceed from payment step to OTP step ────────────────────
   const handlePaymentNext = () => {
     if (!booking?.is_already_paid && !paymentChoice) {
       Alert.alert(
@@ -310,12 +599,8 @@ export default function NavigationScreen({route, navigation}: any) {
     setDeliveryStep('otp');
   };
 
-  // ── Final confirm — verify OTP + complete trip ───────────────
   const handleConfirmComplete = async () => {
-    if (!bookingId || completing) {
-      return;
-    }
-
+    if (!bookingId || completing) return;
     if (!otpInput.trim() || otpInput.trim().length !== 6) {
       Alert.alert(
         'Enter OTP',
@@ -323,13 +608,11 @@ export default function NavigationScreen({route, navigation}: any) {
       );
       return;
     }
-
     const tollAmount = hasToll ? parseFloat(tollAmountText) : 0;
     if (hasToll && (!tollAmountText || isNaN(tollAmount) || tollAmount <= 0)) {
       Alert.alert('Enter Toll Amount', 'Please enter a valid toll amount.');
       return;
     }
-
     setCompleting(true);
     const activeId = booking?.id || bookingId;
     try {
@@ -354,9 +637,7 @@ export default function NavigationScreen({route, navigation}: any) {
   };
 
   const openUpiApp = () => {
-    if (!booking) {
-      return;
-    }
+    if (!booking) return;
     const upiUrl = buildUpiUrl(Number(booking.estimated_fare), booking.id);
     Linking.openURL(upiUrl).catch(() =>
       Alert.alert(
@@ -413,7 +694,6 @@ export default function NavigationScreen({route, navigation}: any) {
             <Marker coordinate={dropCoords} title="Drop" pinColor="#EF4444" />
           )}
         </MapView>
-
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
@@ -424,16 +704,20 @@ export default function NavigationScreen({route, navigation}: any) {
             color="#1C1C1E"
           />
         </TouchableOpacity>
-
-        {/* Navigate button */}
         {destination && (
           <TouchableOpacity
             style={styles.navigateBtn}
             onPress={openGoogleMapsNav}
             activeOpacity={0.8}>
-            <Ionicons name="navigate" size={moderateScale(20)} color="#FFFFFF" />
+            <Ionicons
+              name="navigate"
+              size={moderateScale(20)}
+              color="#FFFFFF"
+            />
             <Text style={styles.navigateBtnText}>
-              {step === 'delivering' ? 'Navigate to Drop' : 'Navigate to Pickup'}
+              {step === 'delivering'
+                ? 'Navigate to Drop'
+                : 'Navigate to Pickup'}
             </Text>
           </TouchableOpacity>
         )}
@@ -483,7 +767,7 @@ export default function NavigationScreen({route, navigation}: any) {
           </View>
         ) : null}
 
-        {/* Contact cards — sender always shown; receiver shown during delivery */}
+        {/* Contact cards */}
         {booking && (
           <View style={styles.contactsRow}>
             <ContactCard
@@ -577,20 +861,17 @@ export default function NavigationScreen({route, navigation}: any) {
                   size={moderateScale(20)}
                   color="#FFFFFF"
                 />
-                <Text style={styles.actionBtnText}>
-                  Picked Up — Start Delivery
-                </Text>
+                <Text style={styles.actionBtnText}>Confirm Pickup</Text>
               </>
             )}
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnGreen]}
-            onPress={openDeliveryModal}
-            activeOpacity={0.8}>
-            <Ionicons name="flag" size={moderateScale(20)} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>Mark as Delivered</Text>
-          </TouchableOpacity>
+          <SlideToConfirm
+            label="Slide to Confirm Delivery"
+            onSlideComplete={openDeliveryModal}
+            color="#16A34A"
+            icon="chevron-forward"
+          />
         )}
       </View>
 
@@ -604,7 +885,9 @@ export default function NavigationScreen({route, navigation}: any) {
               styles.modalBox,
               {
                 paddingBottom:
-                  Platform.OS === 'ios' ? verticalScale(44) : verticalScale(24),
+                  Platform.OS === 'ios'
+                    ? verticalScale(44)
+                    : verticalScale(24),
               },
             ]}>
             <View style={styles.modalHeader}>
@@ -613,8 +896,6 @@ export default function NavigationScreen({route, navigation}: any) {
                 Enter the OTP shared by the customer to confirm package handover
               </Text>
             </View>
-
-            {/* Customer OTP hint */}
             <View style={styles.pickupOtpHintBox}>
               <Ionicons
                 name="person-circle-outline"
@@ -626,25 +907,17 @@ export default function NavigationScreen({route, navigation}: any) {
                   Ask customer for their Pickup OTP
                 </Text>
                 <Text style={styles.pickupOtpHintSub}>
-                  Customer received it via SMS when booking was placed
+                  The sender should be able to see both OTPs, and the receiver
+                  should receive only the receiver's OTP via SMS.
                 </Text>
               </View>
             </View>
-
             <Text style={styles.otpLabel}>Pickup OTP</Text>
-            <TextInput
-              style={styles.otpInput}
+            <OtpBoxInput
               value={pickupOtpInput}
-              onChangeText={v =>
-                setPickupOtpInput(v.replace(/\D/g, '').slice(0, 6))
-              }
-              keyboardType="number-pad"
-              maxLength={6}
-              placeholder="• • • • • •"
-              placeholderTextColor="#9CA3AF"
+              onChange={setPickupOtpInput}
               autoFocus
             />
-
             <View style={styles.modalBtns}>
               <TouchableOpacity
                 style={styles.cancelModalBtn}
@@ -680,7 +953,6 @@ export default function NavigationScreen({route, navigation}: any) {
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled">
-              {/* Header */}
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Complete Delivery</Text>
                 <Text style={styles.modalSubtitle}>
@@ -693,7 +965,6 @@ export default function NavigationScreen({route, navigation}: any) {
               {/* ── STEP 1: PAYMENT ── */}
               {deliveryStep === 'payment' && (
                 <>
-                  {/* Already Paid banner */}
                   {isAlreadyPaid ? (
                     <View style={styles.alreadyPaidBanner}>
                       <Ionicons
@@ -715,10 +986,8 @@ export default function NavigationScreen({route, navigation}: any) {
                       <Text style={styles.paymentSelectLabel}>
                         {booking?.paid_by === 'receiver'
                           ? 'Collect payment from receiver'
-                          : 'How is the sender paying?'}
+                          : 'Select Payment Method'}
                       </Text>
-
-                      {/* Cash option */}
                       <TouchableOpacity
                         style={[
                           styles.paymentOption,
@@ -732,11 +1001,15 @@ export default function NavigationScreen({route, navigation}: any) {
                             styles.paymentOptionIcon,
                             {backgroundColor: '#F0FDF4'},
                           ]}>
-                          <Text style={styles.paymentOptionEmoji}>💵</Text>
+                          <Image
+                            source={require('../assets/cash.png')}
+                            style={styles.paymentOptionIconImg}
+                            resizeMode="contain"
+                          />
                         </View>
                         <View style={styles.paymentOptionTexts}>
                           <Text style={styles.paymentOptionTitle}>
-                            Collect Cash
+                            Cash Payment
                           </Text>
                           <Text style={styles.paymentOptionSub}>
                             Collect {fmt(estimatedFare)} from{' '}
@@ -756,8 +1029,6 @@ export default function NavigationScreen({route, navigation}: any) {
                           )}
                         </View>
                       </TouchableOpacity>
-
-                      {/* UPI/QR option */}
                       <TouchableOpacity
                         style={[
                           styles.paymentOption,
@@ -771,11 +1042,15 @@ export default function NavigationScreen({route, navigation}: any) {
                             styles.paymentOptionIcon,
                             {backgroundColor: '#EFF6FF'},
                           ]}>
-                          <Text style={styles.paymentOptionEmoji}>📱</Text>
+                          <Image
+                            source={require('../assets/bhim.png')}
+                            style={styles.paymentOptionIconImg}
+                            resizeMode="contain"
+                          />
                         </View>
                         <View style={styles.paymentOptionTexts}>
                           <Text style={styles.paymentOptionTitle}>
-                            UPI / Online
+                            UPI / QR Payment
                           </Text>
                           <Text style={styles.paymentOptionSub}>
                             Show QR to{' '}
@@ -796,8 +1071,6 @@ export default function NavigationScreen({route, navigation}: any) {
                           )}
                         </View>
                       </TouchableOpacity>
-
-                      {/* QR code panel — shown when online selected */}
                       {paymentChoice === 'online' && (
                         <View style={styles.qrPanel}>
                           <Text style={styles.qrPanelTitle}>
@@ -827,15 +1100,12 @@ export default function NavigationScreen({route, navigation}: any) {
                             </Text>
                           </TouchableOpacity>
                           <Text style={styles.qrHint}>
-                            Once customer confirms payment, tap "Next" to enter
-                            OTP
+                            Once customer confirms payment, slide to enter OTP
                           </Text>
                         </View>
                       )}
                     </>
                   )}
-
-                  {/* Toll toggle — only for 4-wheelers, not bikes */}
                   {booking?.vehicle_type &&
                     !['bike', 'bicycle', 'scooter', 'ev_bike'].includes(
                       booking.vehicle_type.toLowerCase(),
@@ -870,7 +1140,6 @@ export default function NavigationScreen({route, navigation}: any) {
                             />
                           </TouchableOpacity>
                         </View>
-
                         {hasToll && (
                           <View style={styles.tollInputWrap}>
                             <Text style={styles.tollInputLabel}>
@@ -882,7 +1151,9 @@ export default function NavigationScreen({route, navigation}: any) {
                                 style={styles.tollInput}
                                 value={tollAmountText}
                                 onChangeText={v =>
-                                  setTollAmountText(v.replace(/[^0-9.]/g, ''))
+                                  setTollAmountText(
+                                    v.replace(/[^0-9.]/g, ''),
+                                  )
                                 }
                                 keyboardType="decimal-pad"
                                 placeholder="0"
@@ -893,8 +1164,6 @@ export default function NavigationScreen({route, navigation}: any) {
                         )}
                       </>
                     )}
-
-                  {/* Fare preview */}
                   <View style={styles.fareBreakdown}>
                     <FareRow label="Trip Fare" value={fmt(estimatedFare)} />
                     {hasToll && tollAmount > 0 && (
@@ -908,26 +1177,24 @@ export default function NavigationScreen({route, navigation}: any) {
                     <FareRow label="Total" value={fmt(totalFare)} bold />
                   </View>
 
-                  {/* Buttons */}
-                  <View style={styles.modalBtns}>
+                  {/* ── Slide to Next ── */}
+                  <View style={styles.sliderActionArea}>
+                    <SlideToConfirm
+                      label="Slide to Enter OTP →"
+                      onSlideComplete={handlePaymentNext}
+                      color="#3B82F6"
+                      icon="chevron-forward"
+                    />
                     <TouchableOpacity
-                      style={styles.cancelModalBtn}
+                      style={styles.ghostBackBtn}
                       onPress={() => setDeliveryModalVisible(false)}
                       activeOpacity={0.7}>
-                      <Text style={styles.cancelModalBtnText}>Back</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.confirmBtn}
-                      onPress={handlePaymentNext}
-                      activeOpacity={0.8}>
-                      <Text style={styles.confirmBtnText}>
-                        Next — Enter OTP
-                      </Text>
                       <Ionicons
-                        name="arrow-forward"
-                        size={moderateScale(16)}
-                        color="#FFFFFF"
+                        name="arrow-back"
+                        size={moderateScale(14)}
+                        color="#9CA3AF"
                       />
+                      <Text style={styles.ghostBackBtnText}>Back</Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -936,7 +1203,6 @@ export default function NavigationScreen({route, navigation}: any) {
               {/* ── STEP 2: OTP ── */}
               {deliveryStep === 'otp' && (
                 <>
-                  {/* Payment summary badge */}
                   <View
                     style={
                       isAlreadyPaid
@@ -967,26 +1233,31 @@ export default function NavigationScreen({route, navigation}: any) {
                         : `Online: ${fmt(totalFare)}`}
                     </Text>
                   </View>
-
-                  {/* OTP sent notice */}
                   <View style={styles.otpSentBox}>
-                    <Ionicons name="phone-portrait-outline" size={moderateScale(22)} color="#10B981" />
+                    <Ionicons
+                      name="phone-portrait-outline"
+                      size={moderateScale(22)}
+                      color="#10B981"
+                    />
                     <View style={{flex: 1}}>
-                      <Text style={styles.otpSentTitle}>OTP sent to receiver via SMS</Text>
+                      <Text style={styles.otpSentTitle}>
+                        OTP sent to receiver via SMS
+                      </Text>
                       <Text style={styles.otpSentSub}>
                         {booking?.receiver_phone || booking?.sender_phone
-                          ? `Sent to ${booking?.receiver_phone || booking?.sender_phone}`
+                          ? `Sent to ${
+                              booking?.receiver_phone || booking?.sender_phone
+                            }`
                           : 'Receiver was sent the OTP when package was picked up'}
                       </Text>
                     </View>
                   </View>
-
-                  {/* Resend button */}
                   {!booking?.delivery_otp_verified && (
                     <TouchableOpacity
                       style={[
                         styles.resendOtpBtn,
-                        (isResending || resendCooldown > 0) && styles.resendOtpBtnDisabled,
+                        (isResending || resendCooldown > 0) &&
+                          styles.resendOtpBtnDisabled,
                       ]}
                       onPress={handleResendDeliveryOtp}
                       disabled={isResending || resendCooldown > 0}
@@ -994,48 +1265,53 @@ export default function NavigationScreen({route, navigation}: any) {
                       {isResending ? (
                         <ActivityIndicator color="#10B981" size="small" />
                       ) : (
-                        <Ionicons name="refresh" size={moderateScale(15)} color={resendCooldown > 0 ? '#9CA3AF' : '#10B981'} />
+                        <Ionicons
+                          name="refresh"
+                          size={moderateScale(15)}
+                          color={resendCooldown > 0 ? '#9CA3AF' : '#10B981'}
+                        />
                       )}
-                      <Text style={[styles.resendOtpBtnText, resendCooldown > 0 && {color: '#9CA3AF'}]}>
-                        {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP to Receiver'}
+                      <Text
+                        style={[
+                          styles.resendOtpBtnText,
+                          resendCooldown > 0 && {color: '#9CA3AF'},
+                        ]}>
+                        {resendCooldown > 0
+                          ? `Resend in ${resendCooldown}s`
+                          : 'Resend OTP to Receiver'}
                       </Text>
                     </TouchableOpacity>
                   )}
-
-                  {/* OTP entry */}
                   <Text style={styles.otpLabel}>Delivery OTP</Text>
                   <Text style={styles.otpHint}>
                     Ask the receiver to share the 6-digit OTP
                   </Text>
-                  <TextInput
-                    style={styles.otpInput}
+                  <OtpBoxInput
                     value={otpInput}
-                    onChangeText={v => setOtpInput(v.replace(/\D/g, '').slice(0, 6))}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    placeholder="• • • • • •"
-                    placeholderTextColor="#9CA3AF"
+                    onChange={setOtpInput}
                     autoFocus
                   />
 
-                  {/* Buttons */}
-                  <View style={styles.modalBtns}>
+                  {/* ── Slide to Confirm Delivery ── */}
+                  <View style={styles.sliderActionArea}>
+                    <SlideToConfirm
+                      label="Slide to Confirm Delivery"
+                      onSlideComplete={handleConfirmComplete}
+                      color="#16A34A"
+                      disabled={completing}
+                      loading={completing}
+                      icon="checkmark"
+                    />
                     <TouchableOpacity
-                      style={styles.cancelModalBtn}
+                      style={styles.ghostBackBtn}
                       onPress={() => setDeliveryStep('payment')}
                       activeOpacity={0.7}>
-                      <Text style={styles.cancelModalBtnText}>Back</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.confirmBtn, completing && styles.confirmBtnDisabled]}
-                      onPress={handleConfirmComplete}
-                      disabled={completing}
-                      activeOpacity={0.8}>
-                      {completing ? (
-                        <ActivityIndicator color="#FFFFFF" />
-                      ) : (
-                        <Text style={styles.confirmBtnText}>Confirm Delivery</Text>
-                      )}
+                      <Ionicons
+                        name="arrow-back"
+                        size={moderateScale(14)}
+                        color="#9CA3AF"
+                      />
+                      <Text style={styles.ghostBackBtnText}>Back</Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -1114,7 +1390,6 @@ export default function NavigationScreen({route, navigation}: any) {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────
-
 function StepDot({
   active,
   done,
@@ -1215,11 +1490,8 @@ function ContactCard({
   color: string;
 }) {
   const handleCall = () => {
-    if (phone) {
-      Linking.openURL(`tel:${phone}`);
-    }
+    if (phone) Linking.openURL(`tel:${phone}`);
   };
-
   return (
     <View style={[styles.contactCard, {borderLeftColor: color}]}>
       <Text style={[styles.contactLabel, {color}]}>{label}</Text>
@@ -1234,7 +1506,6 @@ function ContactCard({
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#F0F4FF'},
   centered: {
@@ -1243,7 +1514,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F0F4FF',
   },
-
   // Map
   mapArea: {flex: 1, backgroundColor: '#E8EFF8'},
   backBtn: {
@@ -1284,7 +1554,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-
   // Bottom sheet
   sheet: {
     backgroundColor: '#FFFFFF',
@@ -1308,7 +1577,6 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(12),
     marginBottom: verticalScale(16),
   },
-
   // Step indicator
   stepRow: {
     flexDirection: 'row',
@@ -1336,7 +1604,6 @@ const styles = StyleSheet.create({
   },
   stepLabel: {fontSize: moderateScale(11), color: '#9CA3AF', fontWeight: '600'},
   stepLabelActive: {color: '#3B82F6'},
-
   // Address card
   addressCard: {
     backgroundColor: '#F9FAFB',
@@ -1383,9 +1650,6 @@ const styles = StyleSheet.create({
     marginVertical: verticalScale(10),
     marginLeft: scale(20),
   },
-  receiverRow: {flexDirection: 'row', alignItems: 'center', gap: scale(6)},
-  receiverText: {fontSize: moderateScale(12), color: '#6B7280', flex: 1},
-
   // Fare row
   fareRow: {
     flexDirection: 'row',
@@ -1414,7 +1678,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#16A34A',
   },
-
   // Paid by banner
   paidByBanner: {
     flexDirection: 'row',
@@ -1428,7 +1691,6 @@ const styles = StyleSheet.create({
   paidBySender: {backgroundColor: '#E0F2FE'},
   paidByReceiver: {backgroundColor: '#EDE9FE'},
   paidByText: {fontSize: moderateScale(12), fontWeight: '700'},
-
   // Action button
   actionBtn: {
     backgroundColor: '#3B82F6',
@@ -1455,15 +1717,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-
   // Modal overlay
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
-
-  // Delivery modal
+  // Modal box
   modalBox: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: moderateScale(24),
@@ -1481,7 +1741,6 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(4),
   },
   modalSubtitle: {fontSize: moderateScale(13), color: '#6B7280'},
-
   // Pickup OTP hint
   pickupOtpHintBox: {
     flexDirection: 'row',
@@ -1504,7 +1763,6 @@ const styles = StyleSheet.create({
     color: '#3B82F6',
     marginTop: 2,
   },
-
   // Already paid
   alreadyPaidBanner: {
     flexDirection: 'row',
@@ -1524,7 +1782,6 @@ const styles = StyleSheet.create({
     color: '#15803D',
   },
   alreadyPaidSub: {fontSize: moderateScale(12), color: '#4ADE80', marginTop: 2},
-
   // Payment options
   paymentSelectLabel: {
     fontSize: moderateScale(13),
@@ -1552,7 +1809,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexShrink: 0,
   },
-  paymentOptionEmoji: {fontSize: moderateScale(22)},
+  paymentOptionIconImg: {
+    width: moderateScale(28),
+    height: moderateScale(28),
+  },
   paymentOptionTexts: {flex: 1},
   paymentOptionTitle: {
     fontSize: moderateScale(14),
@@ -1581,7 +1841,6 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(5),
     backgroundColor: '#3B82F6',
   },
-
   // QR panel
   qrPanel: {
     backgroundColor: '#F8FAFF',
@@ -1639,7 +1898,6 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(10),
     textAlign: 'center',
   },
-
   // Payment summary badge (OTP step)
   paymentSummaryBadge: {
     flexDirection: 'row',
@@ -1655,8 +1913,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E40AF',
   },
-
-  // OTP entry
+  // OTP label / hint
   otpLabel: {
     fontSize: moderateScale(15),
     fontWeight: '700',
@@ -1668,20 +1925,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: verticalScale(12),
   },
-  otpInput: {
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-    borderRadius: moderateScale(14),
-    padding: scale(16),
-    fontSize: moderateScale(28),
-    fontWeight: '800',
-    color: '#1C1C1E',
-    textAlign: 'center',
-    letterSpacing: scale(8),
-    marginBottom: verticalScale(20),
-    backgroundColor: '#F8FAFF',
-  },
-
   // Toll toggle
   tollToggleRow: {
     flexDirection: 'row',
@@ -1731,7 +1974,6 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   toggleThumbOn: {transform: [{translateX: moderateScale(22)}]},
-
   // Toll input
   tollInputWrap: {marginBottom: verticalScale(12)},
   tollInputLabel: {
@@ -1762,7 +2004,6 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
     paddingVertical: verticalScale(12),
   },
-
   // Fare breakdown
   fareBreakdown: {
     backgroundColor: '#F9FAFB',
@@ -1787,7 +2028,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     marginVertical: verticalScale(4),
   },
-
   // Modal buttons
   modalBtns: {flexDirection: 'row', gap: scale(12)},
   cancelModalBtn: {
@@ -1827,7 +2067,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-
+  // Slider action area (replaces modalBtns for slider flows)
+  sliderActionArea: {
+    gap: verticalScale(10),
+    marginBottom: verticalScale(4),
+  },
+  ghostBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scale(4),
+    paddingVertical: verticalScale(8),
+  },
+  ghostBackBtnText: {
+    fontSize: moderateScale(13),
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
   // Trip summary
   summaryBox: {
     backgroundColor: '#FFFFFF',
@@ -1888,7 +2144,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-
   // Contact cards
   contactsRow: {
     flexDirection: 'row',
@@ -1928,7 +2183,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-
   // OTP sent info box
   otpSentBox: {
     flexDirection: 'row',
@@ -1948,7 +2202,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   otpSentSub: {fontSize: moderateScale(11), color: '#4ADE80'},
-
   // Resend button
   resendOtpBtn: {
     flexDirection: 'row',
